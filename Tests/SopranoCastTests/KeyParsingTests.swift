@@ -88,4 +88,60 @@ struct KeyParsingTests {
         #expect(!KeySpec.character("k").matches(KeyEvent(kind: .keyDown, keyCode: 0x28, modifiers: [], characters: "k")))
         #expect(!KeySpec.character("k").matches(KeyEvent(kind: .flagsChanged, keyCode: 0x37, modifiers: [.command])))
     }
+
+    @Test("physical keys parse by US name or hex code and spell themselves canonically")
+    func physicalKeys() {
+        #expect(KeySpec(settingsText: "key:'") == .physical(0x27))
+        #expect(KeySpec(settingsText: "KEY:Z") == .physical(0x06))
+        #expect(KeySpec(settingsText: "key:§") == .physical(0x0A))
+        #expect(KeySpec(settingsText: "key:`") == .physical(0x32))
+        #expect(KeySpec(settingsText: "key:0x0A") == .physical(0x0A))
+        #expect(KeySpec(settingsText: "key:0x4b") == .physical(0x4B))
+
+        #expect(KeySpec.physical(0x27).settingsText == "key:'")
+        #expect(KeySpec.physical(0x06).settingsText == "key:z")
+        #expect(KeySpec.physical(0x4B).settingsText == "key:0x4b")
+        #expect(KeySpec.physical(0x41).settingsText == "key:0x41")
+        for code in UInt16(0)...127 where !NamedKey.allCases.contains(where: { $0.keyCodes.contains(code) }) {
+            #expect(KeySpec(settingsText: KeySpec.physical(code).settingsText) == .physical(code))
+        }
+    }
+
+    @Test("physical keys reject unknown names, named-key codes and codes past 127")
+    func physicalRejections() {
+        #expect(KeySpec(settingsText: "key:") == nil)
+        #expect(KeySpec(settingsText: "key:ä") == nil)
+        #expect(KeySpec(settingsText: "key:space") == nil)
+        #expect(KeySpec(settingsText: "key:0x7a") == nil)
+        #expect(KeySpec(settingsText: "key:0x24") == nil)
+        #expect(KeySpec(settingsText: "key:0x80") == nil)
+        #expect(KeySpec(settingsText: "key:0xzz") == nil)
+    }
+
+    @Test("US key names map to key codes both ways")
+    func physicalKeyNames() {
+        #expect(PhysicalKeyNames.name(forKeyCode: 0x27) == "'")
+        #expect(PhysicalKeyNames.name(forKeyCode: 0x0A) == "§")
+        #expect(PhysicalKeyNames.name(forKeyCode: 0x12) == "1")
+        #expect(PhysicalKeyNames.name(forKeyCode: 0x24) == nil)
+        #expect(PhysicalKeyNames.keyCode(forName: "K") == 0x28)
+        #expect(PhysicalKeyNames.keyCode(forName: "\\") == 0x2A)
+        #expect(PhysicalKeyNames.keyCode(forName: "ä") == nil)
+    }
+
+    @Test("physical symbols show the US name uppercased or the hex code")
+    func physicalSymbols() {
+        #expect(KeySpec.physical(0x27).symbol == "'")
+        #expect(KeySpec.physical(0x06).symbol == "Z")
+        #expect(KeySpec.physical(0x0A).symbol == "§")
+        #expect(KeySpec.physical(0x4B).symbol == "0x4b")
+    }
+
+    @Test("physical keys match by key code whatever the layout types")
+    func physicalMatching() {
+        let quote = KeySpec.physical(0x27)
+        #expect(quote.matches(KeyEvent(kind: .keyDown, keyCode: 0x27, modifiers: .command, characters: "ä", baseCharacters: "ä")))
+        #expect(quote.matches(KeyEvent(kind: .keyDown, keyCode: 0x27, modifiers: .command, characters: "'", baseCharacters: "'")))
+        #expect(!quote.matches(KeyEvent(kind: .keyDown, keyCode: 0x29, modifiers: .command, characters: "'", baseCharacters: "'")))
+    }
 }

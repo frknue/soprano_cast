@@ -19,12 +19,12 @@ struct HotkeyRecorderTests {
         flags([], [], at: time)
     }
 
-    @Test("shift+cmd+1 shows pending keycaps, then records the unshifted digit")
+    @Test("shift+cmd+1 shows pending keycaps, then records the digit's physical key")
     func shiftCommandDigit() {
         var recorder = HotkeyRecorder()
         #expect(recorder.handle(flags(.command, .leftCommand)) == .pending(display: ["L⌘"]))
         #expect(recorder.handle(flags([.command, .shift], [.leftCommand, .leftShift])) == .pending(display: ["L⇧", "L⌘"]))
-        let combo = HotkeySpec.combo(HotkeyCombo(modifiers: [.command, .shift], key: .character("1")))
+        let combo = HotkeySpec.combo(HotkeyCombo(modifiers: [.command, .shift], key: .physical(0x12)))
         #expect(recorder.handle(key(0x12, [.command, .shift], sides: [.leftCommand, .leftShift], characters: "!", base: "1")) == .recorded(combo))
         #expect(recorder.handle(KeyEvent(kind: .keyUp, keyCode: 0x12, modifiers: [.command, .shift])) == .unchanged)
         #expect(recorder.handle(flags(.command, .leftCommand)) == .unchanged)
@@ -71,8 +71,19 @@ struct HotkeyRecorderTests {
     func hyperModifiers() {
         var recorder = HotkeyRecorder()
         let update = recorder.handle(key(0x12, .hyper, characters: "!", base: "1"))
-        #expect(update == .recorded(.combo(HotkeyCombo(modifiers: .hyper, usesHyper: false, key: .character("1")))))
-        #expect(recorder.recorded?.settingsText == "ctrl+opt+shift+cmd+1")
+        #expect(update == .recorded(.combo(HotkeyCombo(modifiers: .hyper, usesHyper: false, key: .physical(0x12)))))
+        #expect(recorder.recorded?.settingsText == "ctrl+opt+shift+cmd+key:1")
+    }
+
+    @Test("printable keys record by position, so cmd+ä on German is the ' key everywhere")
+    func physicalKeys() {
+        var recorder = HotkeyRecorder()
+        let quote = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .physical(0x27)))
+        #expect(recorder.handle(key(0x27, .command, base: "ä")) == .recorded(quote))
+        #expect(recorder.recorded?.settingsText == "cmd+key:'")
+        #expect(recorder.handle(key(0x0A, .command, base: "^")) == .recorded(.combo(HotkeyCombo(modifiers: .command, key: .physical(0x0A)))))
+        #expect(recorder.recorded?.settingsText == "cmd+key:§")
+        #expect(recorder.handle(key(0x7B, [.control, .option])) == .recorded(.combo(HotkeyCombo(modifiers: [.control, .option], key: .named(.left)))))
     }
 
     @Test("tapping right cmd alone records a right-sided tap")
@@ -142,7 +153,7 @@ struct HotkeyRecorderTests {
     func keyDuringHold() {
         var recorder = HotkeyRecorder()
         _ = recorder.handle(flags(.command, .rightCommand))
-        let combo = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .character("k")))
+        let combo = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .physical(0x28)))
         #expect(recorder.handle(key(0x28, .command, sides: .rightCommand, base: "k")) == .recorded(combo))
         #expect(recorder.handle(released(at: 0.2)) == .unchanged)
         #expect(recorder.recorded == combo)

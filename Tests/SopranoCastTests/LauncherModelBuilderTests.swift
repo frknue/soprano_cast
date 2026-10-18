@@ -30,12 +30,22 @@ struct LauncherModelBuilderTests {
             toast: toast,
             overlay: overlay,
             settings: settings,
-            icon: { _ in NSImage(size: NSSize(width: 24, height: 24)) }
+            icon: { _ in NSImage(size: NSSize(width: 24, height: 24)) },
+            keycaps: Self.stubKeycaps
         )
     }
 
     private func results(_ items: [CastItem]) -> [ResultSection] {
         [ResultSection(kind: .results, rows: items.map { RankedItem(item: $0, score: 0) })]
+    }
+
+    /// ⌘ plus the key left of Return (0x27), which types "ä" on a German layout.
+    private let physicalCommandQuote = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .physical(0x27)))
+
+    /// A fixed layout: the German one for 0x27, `HotkeySpec.keycaps` for everything else.
+    nonisolated private static func stubKeycaps(_ spec: HotkeySpec) -> [String] {
+        guard case .combo(let combo) = spec, combo.key == .physical(0x27) else { return spec.keycaps }
+        return combo.modifiers.symbols + ["Ä"]
     }
 
     @Test("rows show their kind's label; calculator rows their expression and scripts their package")
@@ -47,15 +57,14 @@ struct LauncherModelBuilderTests {
         #expect(rows.map { $0.subtitle } == ["/Applications", "", ""])
     }
 
-    @Test("rows carry the alias badge and the hotkey keycaps from the settings")
+    @Test("rows carry the alias badge and the hotkey keycaps the layout draws")
     func aliasAndKeycaps() {
         var settings = CastSettings()
         settings.aliases[chrome.id] = "gc"
-        let hotkey = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .character("1")))
-        settings.hotkeys[chrome.id] = hotkey
+        settings.hotkeys[chrome.id] = physicalCommandQuote
         let rows = model(sections: results([chrome, greet]), settings: settings).sections.flatMap { $0.rows }
         #expect(rows.map { $0.alias } == ["gc", nil])
-        #expect(rows[0].hotkeyKeys == hotkey.keycaps)
+        #expect(rows[0].hotkeyKeys == ["⌘", "Ä"])
         #expect(rows[1].hotkeyKeys.isEmpty)
     }
 
@@ -152,20 +161,30 @@ struct LauncherModelBuilderTests {
         #expect(rows[2].keys.isEmpty)
     }
 
-    @Test("the recorder overlay carries the hint and the conflict line")
+    @Test("the recorder overlay draws a hotkey through the keycaps closure and keeps held-key display strings")
     func recorderOverlay() {
         let overlay = LauncherModelBuilder.recorder(
-            itemTitle: "Google Chrome", keys: ["⌘", "1"],
-            conflict: LauncherModelBuilder.conflictText(ownerTitle: "Slack"), countdown: 0.5
+            itemTitle: "Google Chrome", keys: .spec(physicalCommandQuote),
+            conflict: LauncherModelBuilder.conflictText(ownerTitle: "Slack"), countdown: 0.5,
+            keycaps: Self.stubKeycaps
         )
         guard case .recorder(let title, let keys, let conflict, let countdown, let hint) = overlay else {
             Issue.record("not a recorder")
             return
         }
         #expect(title == "Google Chrome")
-        #expect(keys == ["⌘", "1"])
+        #expect(keys == ["⌘", "Ä"])
         #expect(conflict == "Used by Slack")
         #expect(countdown == 0.5)
         #expect(hint == "⌫ clear · ⎋ cancel · ↵ save")
+
+        let pending = LauncherModelBuilder.recorder(
+            itemTitle: "Google Chrome", keys: .display(["R⌘"]), conflict: nil, countdown: nil, keycaps: Self.stubKeycaps
+        )
+        guard case .recorder(_, let held, _, _, _) = pending else {
+            Issue.record("not a recorder")
+            return
+        }
+        #expect(held == ["R⌘"])
     }
 }

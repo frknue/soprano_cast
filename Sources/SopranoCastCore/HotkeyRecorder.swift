@@ -6,8 +6,9 @@ import Foundation
 ///
 /// - Escape / Return / Delete without modifiers → `.cancelled` / `.commit` / `.cleared`.
 /// - Any other keyDown with a modifier, or F13–F20 alone, records a `.combo` (named key when
-///   the key code is a `NamedKey`, else `.character(baseCharacters)`). ⌃⌥⇧⌘ records all four
-///   modifiers; the recorder never writes "hyper".
+///   the key code is a `NamedKey`, else `.physical(keyCode)` — Raycast's default, so the
+///   hotkey survives layout switches). ⌃⌥⇧⌘ records all four modifiers; the recorder never
+///   writes "hyper".
 /// - A keyDown of any other key without modifiers, a repeat, and a keyUp → `.unchanged`.
 /// - flagsChanged while modifiers are held → `.pending(display:)` with sided keycaps ("R⌘").
 ///   Once a key went down during the hold, the recorded combo stays shown: further
@@ -58,14 +59,7 @@ public struct HotkeyRecorder: Sendable {
             }
         }
 
-        let key: KeySpec
-        if let named {
-            key = .named(named)
-        } else if let base = event.baseCharacters, let parsed = KeySpec(settingsText: base) {
-            key = parsed
-        } else {
-            return .unchanged
-        }
+        let key: KeySpec = named.map { .named($0) } ?? .physical(event.keyCode)
         return record(.combo(HotkeyCombo(modifiers: event.modifiers, key: key)))
     }
 

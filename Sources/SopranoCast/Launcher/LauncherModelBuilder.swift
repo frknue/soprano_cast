@@ -24,6 +24,8 @@ enum LauncherModelBuilder {
     ///     and calculator rows).
     ///   - argumentValues: their values in `arguments` order (dropdowns: the option value).
     ///   - focus: the Root Search focus; an overlay overrides it.
+    ///   - keycaps: how an item's hotkey is drawn; physical keys show what they type on the
+    ///     current layout (tests pass a fixed one).
     static func model(
         theme: AppTheme,
         query: String,
@@ -35,7 +37,8 @@ enum LauncherModelBuilder {
         toast: LauncherToast?,
         overlay: OverlayViewModel,
         settings: CastSettings,
-        icon: (ItemIcon) -> NSImage
+        icon: (ItemIcon) -> NSImage,
+        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
     ) -> LauncherViewModel {
         let rows = sections.flatMap(\.rows)
         let selected = selectedIndex.flatMap { rows.indices.contains($0) ? rows[$0].item : nil }
@@ -49,7 +52,9 @@ enum LauncherModelBuilder {
                 let fallbackQuery = section.kind == .fallbacks ? trimmed(query) : nil
                 return SectionViewModel(
                     title: fallbackQuery.map(fallbacksTitle(query:)) ?? section.kind.title,
-                    rows: section.rows.map { row($0, settings: settings, fallbackQuery: fallbackQuery, icon: icon) }
+                    rows: section.rows.map {
+                        row($0, settings: settings, fallbackQuery: fallbackQuery, icon: icon, keycaps: keycaps)
+                    }
                 )
             },
             selectedIndex: selected == nil ? nil : selectedIndex,
@@ -81,7 +86,8 @@ enum LauncherModelBuilder {
         _ ranked: RankedItem,
         settings: CastSettings,
         fallbackQuery: String? = nil,
-        icon: (ItemIcon) -> NSImage
+        icon: (ItemIcon) -> NSImage,
+        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
     ) -> RowViewModel {
         let item = ranked.item
         let subtitle: String
@@ -104,7 +110,7 @@ enum LauncherModelBuilder {
             icon: icon(item.icon),
             accessory: accessory,
             alias: settings.aliases[item.id],
-            hotkeyKeys: settings.hotkeys[item.id]?.keycaps ?? []
+            hotkeyKeys: settings.hotkeys[item.id].map(keycaps) ?? []
         )
     }
 
@@ -168,8 +174,26 @@ enum LauncherModelBuilder {
         }
     }
 
-    static func recorder(itemTitle: String, keys: [String], conflict: String?, countdown: Double?) -> OverlayViewModel {
-        .recorder(itemTitle: itemTitle, keys: keys, conflict: conflict, countdown: countdown, hint: recorderHint)
+    /// What the recorder card shows as keycaps.
+    enum RecorderKeys: Equatable {
+        /// A hotkey (the current one, or what was just recorded), drawn with `keycaps`.
+        case spec(HotkeySpec)
+        /// The recorder's own display strings while modifiers are held.
+        case display([String])
+    }
+
+    static func recorder(
+        itemTitle: String,
+        keys: RecorderKeys,
+        conflict: String?,
+        countdown: Double?,
+        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
+    ) -> OverlayViewModel {
+        let shown = switch keys {
+        case .spec(let spec): keycaps(spec)
+        case .display(let display): display
+        }
+        return .recorder(itemTitle: itemTitle, keys: shown, conflict: conflict, countdown: countdown, hint: recorderHint)
     }
 
     /// "Used by <title>" for the target already holding a recorded hotkey.

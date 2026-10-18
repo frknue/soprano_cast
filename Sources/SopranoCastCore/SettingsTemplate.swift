@@ -28,10 +28,16 @@ public enum SettingsTemplate {
     // Hotkeys (case-insensitive, spaces ignored), every shape Raycast supports:
     //   modifiers + key    "cmd+shift+k", "ctrl+opt+left", "cmd+1", "fn+a", "opt+space"
     //                      modifiers: cmd (command, ⌘), opt (option, alt, ⌥), ctrl (control, ⌃),
-    //                      shift (⇧), fn; keys: one character, "space", "tab", "return",
-    //                      "escape", "delete", "forwardDelete", "left", "right", "up", "down",
-    //                      "home", "end", "pageUp", "pageDown", "f1"…"f20"
-    //   hyper + key        "hyper+1", "hyper+k": the Hyper key (⌃⌥⇧⌘, see "hyperKey")
+    //                      shift (⇧), fn; keys: "space", "tab", "return", "escape", "delete",
+    //                      "forwardDelete", "left", "right", "up", "down", "home", "end",
+    //                      "pageUp", "pageDown", "f1"…"f20", or a printable key one of two ways:
+    //     by position      "cmd+key:'", "cmd+key:§", "ctrl+key:z", "cmd+key:0x27": the key at
+    //                      that place on a US keyboard (or its key code), whatever the current
+    //                      layout types there; "cmd+key:'" stays the key right of L on German
+    //                      (where it types ä). Raycast's default; recorded hotkeys use this.
+    //     by character     "cmd+'", "cmd+k": the key that types this character on the current
+    //                      layout, looked up again when the layout changes
+    //   hyper + key        "hyper+1", "hyper+key:k": the Hyper key (⌃⌥⇧⌘, see "hyperKey")
     //   key alone          "f13" … "f20" only
     //   modifier tap       "rcmd", "lopt", "cmd+opt", "fn": press and release only modifiers;
     //                      sided names lcmd rcmd lopt ropt lctrl rctrl lshift rshift,

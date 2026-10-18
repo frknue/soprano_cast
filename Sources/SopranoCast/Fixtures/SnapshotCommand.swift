@@ -111,6 +111,7 @@ enum SnapshotCommand {
                      up down left right home end pageUp pageDown f1 … f20
         characters   one character types it when the launcher doesn't use it
                      ("A" = shift+a, "!" = shift+1; US keyboard)
+        key:<name>   a printable key by position: key:' key:z key:0x27 (cmd+key:')
         modifiers    cmd shift opt ctrl fn joined with "+" before a key:
                      cmd+k cmd+return opt+return shift+tab shift+cmd+, cmd+f cmd+esc ctrl+n
         rec:<hotkey> the key events that record a settings.json hotkey in the recorder:
@@ -196,8 +197,12 @@ enum SnapshotCommand {
             guard let press = characterPress(character) else { throw OptionError.unknownKeyToken(text) }
             return .press(press.key, modifiers.union(press.modifiers))
         }
-        guard case .named(let named)? = KeySpec(settingsText: keyText) else { throw OptionError.unknownKeyToken(text) }
-        return .press(.named(named), modifiers)
+        // A named key, or a physical key by position ("cmd+key:'", "key:0x27").
+        switch KeySpec(settingsText: keyText) {
+        case .named(let named)?: return .press(.named(named), modifiers)
+        case .physical(let code)?: return .press(.physical(code), modifiers)
+        case .character?, nil: throw OptionError.unknownKeyToken(text)
+        }
     }
 
     /// The unshifted key and the Shift a typed character needs on a US keyboard.
@@ -210,7 +215,8 @@ enum SnapshotCommand {
         return nil
     }
 
-    /// Whether `spec`'s keys exist on the US keyboard the replay types on.
+    /// Whether `spec`'s keys exist on the US keyboard the replay types on. Named and
+    /// physical keys are key codes already; only a character needs a US key that types it.
     private nonisolated static func isReplayable(_ spec: HotkeySpec) -> Bool {
         guard case .combo(let combo) = spec, case .character(let character) = combo.key else { return true }
         return characterKeyCodes[character] != nil
@@ -520,6 +526,11 @@ enum SnapshotCommand {
                 // ⇧⇥ types backtab.
                 characters = named == .tab && modifiers.contains(.shift) ? "\u{19}" : base
                 if [.up, .down, .left, .right].contains(named) { modifiers.insert(.function) }
+            case .physical(let code):
+                keyCode = code
+                // What the key types on a US layout, the layout the replay pretends to have.
+                base = PhysicalKeyNames.name(forKeyCode: code) ?? ""
+                characters = modifiers.contains(.shift) ? (base.first.map(Self.shifted) ?? base) : base
             case .character(let character):
                 keyCode = SnapshotCommand.characterKeyCodes[character] ?? 0
                 base = String(character)

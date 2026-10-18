@@ -131,15 +131,24 @@ struct WindowLayoutTests {
         #expect(frame(.center, window: huge, gap: 10) == CGRect(x: 10, y: 40, width: 1420, height: 840))
     }
 
-    @Test("moves keep the size and touch one edge, leaving the other coordinate alone")
+    @Test("moves keep the size, touch one edge and center along it")
     func moves() {
         let start = CGRect(x: 300, y: 500, width: 600, height: 400)
-        #expect(frame(.moveUp, window: start) == CGRect(x: 300, y: 30, width: 600, height: 400))
-        #expect(frame(.moveUp, window: start, gap: 10) == CGRect(x: 300, y: 40, width: 600, height: 400))
-        #expect(frame(.moveDown, window: start, gap: 10) == CGRect(x: 300, y: 480, width: 600, height: 400))
-        #expect(frame(.moveLeft, window: start, gap: 10) == CGRect(x: 10, y: 500, width: 600, height: 400))
-        #expect(frame(.moveRight, window: start, gap: 10) == CGRect(x: 830, y: 500, width: 600, height: 400))
-        #expect(frame(.moveRight, window: start) == CGRect(x: 840, y: 500, width: 600, height: 400))
+        #expect(frame(.moveUp, window: start) == CGRect(x: 420, y: 30, width: 600, height: 400))
+        #expect(frame(.moveUp, window: start, gap: 10) == CGRect(x: 420, y: 40, width: 600, height: 400))
+        #expect(frame(.moveDown, window: start) == CGRect(x: 420, y: 490, width: 600, height: 400))
+        #expect(frame(.moveDown, window: start, gap: 10) == CGRect(x: 420, y: 480, width: 600, height: 400))
+        #expect(frame(.moveLeft, window: start) == CGRect(x: 0, y: 260, width: 600, height: 400))
+        #expect(frame(.moveLeft, window: start, gap: 10) == CGRect(x: 10, y: 260, width: 600, height: 400))
+        #expect(frame(.moveRight, window: start) == CGRect(x: 840, y: 260, width: 600, height: 400))
+        #expect(frame(.moveRight, window: start, gap: 10) == CGRect(x: 830, y: 260, width: 600, height: 400))
+    }
+
+    @Test("moves shrink a window larger than the visible frame to fit inside the gaps")
+    func movesClamp() {
+        let huge = CGRect(x: -100, y: 0, width: 2000, height: 1000)
+        #expect(frame(.moveLeft, window: huge, gap: 10) == CGRect(x: 10, y: 40, width: 1420, height: 840))
+        #expect(frame(.moveDown, window: huge) == visible)
     }
 
     @Test("make larger and smaller step by 10 % of the display around the window center")
@@ -200,21 +209,36 @@ struct WindowLayoutTests {
         #expect(handled.allSatisfy { isIntegral(frame($0, gap: 7)!) })
     }
 
-    @Test("moving between displays keeps the relative position and size")
-    func movedKeeps() {
+    @Test("moving to a larger display keeps the relative center, size and aspect ratio")
+    func movedToLarger() {
         let source = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let target = CGRect(x: 1440, y: 0, width: 1920, height: 1080)
         #expect(WindowLayout.moved(CGRect(x: 144, y: 90, width: 720, height: 450), from: source, to: target)
-            == CGRect(x: 1632, y: 108, width: 720, height: 450))
+            == CGRect(x: 1752, y: 153, width: 720, height: 450))
     }
 
-    @Test("moving to a smaller display scales the window down and clamps it inside")
-    func movedScalesAndClamps() {
+    @Test("moving to a smaller display scales both sides by one factor, keeping the aspect ratio")
+    func movedToSmaller() {
         let source = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let smaller = CGRect(x: 1440, y: 0, width: 720, height: 450)
-        #expect(WindowLayout.moved(CGRect(x: 144, y: 90, width: 720, height: 450), from: source, to: smaller)
+        let half = CGRect(x: 1440, y: 0, width: 720, height: 450)
+        #expect(WindowLayout.moved(CGRect(x: 144, y: 90, width: 720, height: 450), from: source, to: half)
             == CGRect(x: 1512, y: 45, width: 360, height: 225))
+        // Only the width ratio shrinks (0.75): both sides scale by it, 800 × 600 → 600 × 450.
+        let narrower = CGRect(x: 1440, y: 0, width: 1080, height: 900)
+        #expect(WindowLayout.moved(CGRect(x: 320, y: 150, width: 800, height: 600), from: source, to: narrower)
+            == CGRect(x: 1680, y: 225, width: 600, height: 450))
+        // Only the height ratio shrinks (⅔): 1200 × 900 → 800 × 600.
+        let shorter = CGRect(x: 1440, y: 0, width: 1440, height: 600)
+        #expect(WindowLayout.moved(CGRect(x: 120, y: 0, width: 1200, height: 900), from: source, to: shorter)
+            == CGRect(x: 1760, y: 0, width: 800, height: 600))
+    }
+
+    @Test("a window larger than the target shrinks uniformly to fit and is clamped inside")
+    func movedFitsAndClamps() {
+        let source = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let sameSize = CGRect(x: 1440, y: 0, width: 1440, height: 900)
+        #expect(WindowLayout.moved(CGRect(x: -280, y: 200, width: 2000, height: 500), from: source, to: sameSize)
+            == CGRect(x: 1440, y: 270, width: 1440, height: 360))
         #expect(WindowLayout.moved(CGRect(x: 1300, y: 800, width: 400, height: 300), from: source, to: sameSize)
             == CGRect(x: 2480, y: 600, width: 400, height: 300))
     }

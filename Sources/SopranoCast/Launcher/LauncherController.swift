@@ -29,12 +29,25 @@ final class LauncherController {
     /// The countdown bar advances this often.
     static let recorderTickMilliseconds = 100
 
+    /// The key code `key` sits on: physical keys their own, named keys their canonical code,
+    /// character keys the one typing that character on the current layout (main thread).
+    nonisolated static func layoutKeyCode(_ key: KeySpec) -> UInt16? {
+        switch key {
+        case .physical(let code): code
+        case .named(let named): named.keyCodes.first
+        case .character(let character): KeyboardLayout.keyCode(for: character)
+        }
+    }
+
     private let sources: [ItemSource]
     private let icons: IconProviding
     private let runner: ItemRunning
     private let presenter: LauncherPresenting
     private let hotkeys: HotkeyRegistering
     private let environment: LauncherEnvironment
+    /// The virtual key code a hotkey key sits on, for conflicts between character and
+    /// physical hotkeys; the current keyboard layout's by default (tests pass a fixed one).
+    private let keyCode: (KeySpec) -> UInt16?
 
     /// Reloaded from `environment.settings()` by `settingsDidChange`.
     private var settings: CastSettings
@@ -72,7 +85,8 @@ final class LauncherController {
         runner: ItemRunning,
         presenter: LauncherPresenting,
         hotkeys: HotkeyRegistering,
-        environment: LauncherEnvironment
+        environment: LauncherEnvironment,
+        keyCode: @escaping (KeySpec) -> UInt16? = LauncherController.layoutKeyCode
     ) {
         self.sources = sources
         self.icons = icons
@@ -80,6 +94,7 @@ final class LauncherController {
         self.presenter = presenter
         self.hotkeys = hotkeys
         self.environment = environment
+        self.keyCode = keyCode
         settings = environment.settings()
         usage = environment.loadUsage()
         history = SearchHistory(entries: environment.loadHistory())
@@ -725,7 +740,8 @@ final class LauncherController {
     /// Opens the recorder on the item's current hotkey and suspends every global hotkey,
     /// so the recorder receives combos like ⌘1 itself.
     private func openRecorder(for item: CastItem) {
-        setOverlay(.recorder(Recorder(item: item, keys: settings.hotkeys[item.id]?.keycaps ?? [])))
+        let current = settings.hotkeys[item.id]
+        setOverlay(.recorder(Recorder(item: item, keys: current.map { .spec($0) } ?? .display([]))))
         hotkeys.suspend()
     }
 
@@ -736,14 +752,14 @@ final class LauncherController {
         case .pending(let display):
             // A new hold: what was recorded is being replaced.
             stopCountdown()
-            session.keys = display
+            session.keys = .display(display)
             session.spec = nil
             session.owner = nil
             session.countdown = nil
             overlay = .recorder(session)
         case .recorded(let spec):
             session.spec = spec
-            session.keys = spec.keycaps
+            session.keys = .spec(spec)
             session.owner = owner(of: spec, for: session.item)
             session.countdown = nil
             overlay = .recorder(session)
@@ -773,12 +789,15 @@ final class LauncherController {
         render()
     }
 
+    /// The target already using `spec`, comparing keys by position: a character hotkey
+    /// (`shift+cmd+k`) and a physical one (`shift+cmd+key:k`) on the same key conflict.
     private func owner(of spec: HotkeySpec, for item: CastItem) -> HotkeyTarget? {
         HotkeyConflicts.owner(
             of: spec,
             in: settings.hotkeyBindings,
             except: .item(item.id),
-            hyperIncludesShift: settings.hyperKey.includeShift
+            hyperIncludesShift: settings.hyperKey.includeShift,
+            keyCode: keyCode
         )
     }
 
@@ -1102,13 +1121,13 @@ private struct Recorder {
     var item: CastItem
     var recorder = HotkeyRecorder()
     /// Keycaps shown: the current hotkey, what is held, or what was recorded.
-    var keys: [String]
+    var keys: LauncherModelBuilder.RecorderKeys
     var spec: HotkeySpec?
     var owner: HotkeyTarget?
     /// 0…1 while the auto-save counts down.
     var countdown: Double?
 
-    init(item: CastItem, keys: [String]) {
+    init(item: CastItem, keys: LauncherModelBuilder.RecorderKeys) {
         self.item = item
         self.keys = keys
     }

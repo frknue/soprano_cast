@@ -52,7 +52,8 @@ extension SidedModifier {
 
 extension HotkeySpec {
     /// Grammar (case-insensitive, spaces ignored):
-    ///   combo:   modifiers "+" key       "cmd+shift+k", "hyper+1", "ctrl+opt+left", "fn+a"
+    ///   combo:   modifiers "+" key       "cmd+shift+k", "hyper+1", "ctrl+opt+left", "fn+a",
+    ///                                    "cmd+key:'" (physical key, see `KeySpec`)
     ///            key alone (F13–F20)     "f13"
     ///   taps:    modifiers only          "rcmd", "lopt", "cmd+opt", "fn"
     ///            (sided names lcmd rcmd lopt ropt lctrl rctrl lshift rshift; plain = any side)
@@ -62,7 +63,8 @@ extension HotkeySpec {
     /// no modifier whose key is not F13–F20.
     ///
     /// The key comes last ("cmd++" is ⌘ and the plus key); each modifier appears at most
-    /// once; combos take plain (side-less) modifier names only.
+    /// once; combos take plain (side-less) modifier names only. "double:"/"both:" only count
+    /// as a prefix of the whole text, so a "key:" key's colon never clashes with them.
     public init?(settingsText: String) {
         let compact = settingsText.filter { !$0.isWhitespace }.lowercased()
         guard !compact.isEmpty else { return nil }

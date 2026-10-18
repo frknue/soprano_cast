@@ -67,7 +67,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 open.keyEquivalent = equivalent.key
                 open.keyEquivalentModifierMask = equivalent.modifiers
             } else {
-                open.title = "Open Soprano Cast  \(hotkey.keycaps.joined())"
+                open.title = "Open Soprano Cast  \(KeyboardLayout.keycaps(for: hotkey).joined())"
             }
         }
         menu.addItem(open)
@@ -102,8 +102,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(item("Quit Soprano Cast", action: #selector(quit), key: "q"))
     }
 
-    /// The menu's key equivalent for a combo hotkey (Hyper expanded); nil for modifier
-    /// gestures and fn combos, which a menu item cannot show.
+    /// The menu's key equivalent for a combo hotkey (Hyper expanded; a physical key as the
+    /// character it types on the current layout); nil for modifier gestures, fn combos and
+    /// physical keys the layout types nothing with, which the title shows as keycaps instead.
     static func keyEquivalent(for spec: HotkeySpec, hyperIncludesShift: Bool) -> (key: String, modifiers: NSEvent.ModifierFlags)? {
         guard case .combo(let combo) = spec else { return nil }
         let modifierSet = combo.effectiveModifiers(hyperIncludesShift: hyperIncludesShift)
@@ -116,6 +117,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let key: String
         switch combo.key {
         case .character(let character):
+            key = String(character).lowercased()
+        case .physical(let code):
+            // The character the key types on the current layout; none → no key equivalent.
+            guard let character = KeyboardLayout.character(for: code) else { return nil }
             key = String(character).lowercased()
         case .named(let named):
             key = keyEquivalentCharacter(for: named)
@@ -171,7 +176,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             case .launcher: "Soprano Cast"
             case .item(let id): titles[id] ?? id.rawValue
             }
-            return "\(failure.binding.spec.displayString) \(target): \(failure.reason)"
+            return "\(KeyboardLayout.keycaps(for: failure.binding.spec).joined()) \(target): \(failure.reason)"
         }
         if let hyperKeyError = problems.hyperKeyError {
             lines.append("Hyper key: \(hyperKeyError)")

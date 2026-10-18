@@ -1,6 +1,7 @@
 import AppKit
 import Testing
 @testable import SopranoCast
+@testable import SopranoCastCore
 
 @MainActor
 struct KeyboardLayoutTests {
@@ -25,5 +26,30 @@ struct KeyboardLayoutTests {
     func nonPrintingKeys() {
         #expect(KeyboardLayout.character(for: 0x24) == nil) // Return
         #expect(KeyboardLayout.character(for: 0x7B) == nil) // ←
+    }
+
+    @Test("a physical key's keycap is what it types on the current layout")
+    func physicalKeycap() {
+        #expect(KeyboardLayout.keycapSymbol(for: .physical(0x12)) == "1")
+    }
+
+    @Test("named keys keep the Core symbol as their keycap")
+    func namedKeycap() {
+        #expect(KeyboardLayout.keycapSymbol(for: .named(.return)) == KeySpec.named(.return).symbol)
+    }
+
+    @Test("combo keycaps show a physical key through the layout, modifiers unchanged")
+    func comboKeycaps() {
+        let spec = HotkeySpec.combo(HotkeyCombo(modifiers: [.command], key: .physical(0x12)))
+        let keycaps = KeyboardLayout.keycaps(for: spec)
+        #expect(keycaps.count == spec.keycaps.count)
+        #expect(keycaps.last == "1")
+        #expect(Array(keycaps.dropLast()) == Array(spec.keycaps.dropLast()))
+    }
+
+    @Test("modifier-only specs keep their Core keycaps")
+    func tapKeycaps() {
+        let spec = HotkeySpec.doubleTap(SidedModifier(.command))
+        #expect(KeyboardLayout.keycaps(for: spec) == spec.keycaps)
     }
 }

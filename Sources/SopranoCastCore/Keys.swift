@@ -102,10 +102,18 @@ public enum NamedKey: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-/// One non-modifier key: by position (`named`) or by the character it types on the
-/// current layout (`character`, lowercased; a "key equivalent" in Raycast's words).
+/// One non-modifier key.
+///
+/// - `named`: a special key by position (arrows, Return, F-keys …).
+/// - `physical`: a printable key by position, independent of the layout — Raycast's default
+///   for recorded hotkeys, so ⌘' keeps working when the user switches from ABC to German
+///   (where the same key types "ä"). Settings spelling: `key:<US name>` (`key:'`, `key:§`,
+///   `key:z`) or `key:0x27`.
+/// - `character`: a "key equivalent": the key that types this character (lowercased) on the
+///   current layout, re-resolved when the layout changes. Settings spelling: the character.
 public enum KeySpec: Hashable, Sendable {
     case named(NamedKey)
+    case physical(UInt16)
     case character(Character)
 }
 

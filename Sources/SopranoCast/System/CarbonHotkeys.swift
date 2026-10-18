@@ -6,8 +6,9 @@ import SopranoCastCore
 /// fire even while Soprano Cast's own panel is key. One `kEventHotKeyPressed` handler on the
 /// application event target dispatches by hotkey id.
 ///
-/// Character keys resolve to key codes on the current layout at registration, so every
-/// registration is redone when the selected input source changes.
+/// Named and physical keys register their key code as is. Character keys resolve to key
+/// codes on the current layout at registration, so every registration is redone when the
+/// selected input source changes.
 ///
 /// The event handler's user data is a retained reference to this object, released never:
 /// it lives for the whole process, like the handler.
@@ -60,6 +61,8 @@ final class CarbonHotkeys {
             switch request.key {
             case .named(let named):
                 keyCode = named.keyCodes[0]
+            case .physical(let code):
+                keyCode = code
             case .character(let character):
                 guard let code = KeyboardLayout.keyCode(for: character) else {
                     failures.append(HotkeyFailure(binding: request.binding, reason: "no key types \(character) on this layout"))

@@ -6,9 +6,10 @@ import CoreGraphics
 /// regions; maximize fills it (minus gaps); almostMaximize = 90 % centered; maximizeHeight /
 /// maximizeWidth keep the other axis; reasonableSize = 60 % of each side capped at 1025 × 900,
 /// centered; center keeps the size (clamped), centered; centerHalf = half width, full height,
-/// centered; moveUp/Down/Left/Right keep the size and touch that edge (with gap), the other
-/// coordinate unchanged; makeLarger/makeSmaller grow/shrink by 10 % of the visible size around
-/// the window center, clamped to the visible frame, at least 200 × 150.
+/// centered; moveUp/Down/Left/Right keep the size (clamped) and touch that edge (with gap),
+/// centered along it (Raycast's "Center Window" option); makeLarger/makeSmaller grow/shrink
+/// by 10 % of the visible size around the window center, clamped to the visible frame, at
+/// least 200 × 150.
 public enum WindowLayout {
     /// The target frame (global Quartz coordinates) for `command` on a window at `frame` on a
     /// display whose visible frame is `visible`. Gap g: g at display edges and between
@@ -55,7 +56,7 @@ public enum WindowLayout {
             return centered(fitted(frame.size, in: inner), in: visible)
         case .moveUp, .moveDown, .moveLeft, .moveRight:
             let size = fitted(frame.size, in: inner)
-            var origin = frame.origin
+            var origin = CGPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2)
             switch command {
             case .moveUp: origin.y = inner.minY
             case .moveDown: origin.y = inner.maxY - size.height
@@ -99,14 +100,22 @@ public enum WindowLayout {
     }
 
     /// `frame` moved from `source` to `target` visible frames keeping its relative position
-    /// and size (scaled when the target is smaller), clamped inside `target`.
+    /// (its center lands on the same relative point of `target`) and its aspect ratio
+    /// (Raycast's "Keep Aspect Ratio"): the size scales by one factor, the smaller of the two
+    /// display ratios when the target is smaller, further reduced until it fits `target`,
+    /// never above 1. Clamped inside `target`; integral.
     public static func moved(_ frame: CGRect, from source: CGRect, to target: CGRect) -> CGRect {
-        let scaleX = source.width > 0 ? min(1, target.width / source.width) : 1
-        let scaleY = source.height > 0 ? min(1, target.height / source.height) : 1
-        let relativeX = source.width > 0 ? (frame.minX - source.minX) / source.width : 0
-        let relativeY = source.height > 0 ? (frame.minY - source.minY) / source.height : 0
-        let size = CGSize(width: min(frame.width * scaleX, target.width), height: min(frame.height * scaleY, target.height))
-        let origin = CGPoint(x: target.minX + relativeX * target.width, y: target.minY + relativeY * target.height)
+        guard frame.width > 0, frame.height > 0 else { return clamped(frame, in: target) }
+        var scale: CGFloat = 1
+        if source.width > 0, source.height > 0 {
+            scale = min(scale, target.width / source.width, target.height / source.height)
+        }
+        scale = min(scale, target.width / frame.width, target.height / frame.height)
+        let size = CGSize(width: (frame.width * scale).rounded(), height: (frame.height * scale).rounded())
+        let relativeX = source.width > 0 ? (frame.midX - source.minX) / source.width : 0.5
+        let relativeY = source.height > 0 ? (frame.midY - source.minY) / source.height : 0.5
+        let center = CGPoint(x: target.minX + relativeX * target.width, y: target.minY + relativeY * target.height)
+        let origin = CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2)
         return clamped(CGRect(origin: origin, size: size), in: target)
     }
 

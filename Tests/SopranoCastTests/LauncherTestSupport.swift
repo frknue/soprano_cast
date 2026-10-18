@@ -263,9 +263,19 @@ final class LauncherHarness {
         self.state = state
         controller = LauncherController(
             sources: [source], icons: StubIcons(), runner: runner, presenter: presenter,
-            hotkeys: hotkeys, environment: environment
+            hotkeys: hotkeys, environment: environment, keyCode: LauncherHarness.usKeyCode
         )
         state.controller = controller
+    }
+
+    /// A fixed US layout for the characters the tests use, so conflicts between character
+    /// and physical hotkeys don't depend on the machine's input source.
+    nonisolated static func usKeyCode(_ key: KeySpec) -> UInt16? {
+        switch key {
+        case .physical(let code): code
+        case .named(let named): named.keyCodes.first
+        case .character(let character): keyCodes[character]
+        }
     }
 
     /// Changing settings takes effect through `controller.settingsDidChange()`.
@@ -344,7 +354,7 @@ final class LauncherHarness {
     }
 
     /// ANSI virtual key codes of the characters the tests type.
-    private static let keyCodes: [Character: UInt16] = [
+    nonisolated private static let keyCodes: [Character: UInt16] = [
         "k": 0x28, "f": 0x03, ",": 0x2B, "w": 0x0D, "o": 0x1F, "c": 0x08, "d": 0x02,
     ]
 

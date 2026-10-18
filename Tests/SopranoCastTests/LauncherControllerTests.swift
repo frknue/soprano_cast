@@ -19,8 +19,14 @@ struct LauncherControllerTests {
         return harness
     }
 
+    /// ⇧⌘K as settings.json may spell it by character (`shift+cmd+k`).
     private var shiftCommandK: HotkeySpec {
         .combo(HotkeyCombo(modifiers: [.shift, .command], key: .character("k")))
+    }
+
+    /// ⇧⌘K as the recorder records it: by key position (`shift+cmd+key:k`).
+    private var recordedShiftCommandK: HotkeySpec {
+        .combo(HotkeyCombo(modifiers: [.shift, .command], key: .physical(0x28)))
     }
 
     // MARK: Search
@@ -317,7 +323,7 @@ struct LauncherControllerTests {
             Issue.record("no recorder overlay")
             return
         }
-        #expect(keys == shiftCommandK.keycaps)
+        #expect(keys == KeyboardLayout.keycaps(for: recordedShiftCommandK))
         #expect(conflict == nil)
         #expect(countdown == 0)
         #expect(harness.edits.isEmpty)
@@ -330,13 +336,13 @@ struct LauncherControllerTests {
         #expect(progress > 0)
 
         harness.scheduler.fireAll()
-        #expect(harness.edits == ["set hotkeys.\(chrome.id.rawValue) = \(shiftCommandK.settingsText)"])
-        #expect(harness.settings.hotkeys[chrome.id] == shiftCommandK)
+        #expect(harness.edits == ["set hotkeys.\(chrome.id.rawValue) = \(recordedShiftCommandK.settingsText)"])
+        #expect(harness.settings.hotkeys[chrome.id] == recordedShiftCommandK)
         #expect(harness.snapshot.overlay == "none")
         #expect(harness.hotkeys.resumeCount == 1)
     }
 
-    @Test("a hotkey another command uses shows its owner and saving moves it over")
+    @Test("a character hotkey another command uses on the same key shows its owner and saving moves it over")
     func recorderOverwritesOwner() {
         var settings = CastSettings()
         settings.hotkeys[slack.id] = shiftCommandK
@@ -352,9 +358,9 @@ struct LauncherControllerTests {
         harness.press(.return)
         #expect(harness.edits == [
             "remove hotkeys.\(slack.id.rawValue)",
-            "set hotkeys.\(chrome.id.rawValue) = \(shiftCommandK.settingsText)",
+            "set hotkeys.\(chrome.id.rawValue) = \(recordedShiftCommandK.settingsText)",
         ])
-        #expect(harness.settings.hotkeys == [chrome.id: shiftCommandK])
+        #expect(harness.settings.hotkeys == [chrome.id: recordedShiftCommandK])
     }
 
     @Test("the launcher's own hotkey shows as used by Soprano Cast and can't be saved")

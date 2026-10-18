@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import SopranoCastCore
 
 /// Characters ↔ key codes on the current keyboard layout. Main thread only (the Text Input
 /// Sources API reads the selected input source).
@@ -35,6 +36,26 @@ enum KeyboardLayout {
             }
             return translate(keyCode, layout: pointer, keyboardType: UInt32(LMGetKbdType()))
         }
+    }
+
+    /// The keycap for `key`: a physical key shows what it types on the current layout,
+    /// uppercased ("Ä" on German for the key ABC types "'" on), falling back to the Core
+    /// symbol when it types nothing printable; named and character keys show `key.symbol`.
+    static func keycapSymbol(for key: KeySpec) -> String {
+        guard case .physical(let code) = key, let character = character(for: code) else {
+            return key.symbol
+        }
+        return String(character).uppercased()
+    }
+
+    /// `spec.keycaps` with a combo's key shown through `keycapSymbol(for:)`; modifier-only
+    /// specs unchanged.
+    static func keycaps(for spec: HotkeySpec) -> [String] {
+        var keycaps = spec.keycaps
+        if case .combo(let combo) = spec, !keycaps.isEmpty {
+            keycaps[keycaps.count - 1] = keycapSymbol(for: combo.key)
+        }
+        return keycaps
     }
 
     /// The 'uchr' data of the current keyboard layout. Input methods without one (some

@@ -44,6 +44,43 @@ struct HotkeyConflictsTests {
         #expect(HotkeyConflicts.conflicts(in: withoutShift, hyperIncludesShift: true).isEmpty)
     }
 
+    @Test("with the default resolver a physical key equals only the same position, never a character key")
+    func physicalKeys() {
+        let samePosition = [binding("cmd+key:'", chrome), binding("command+key:0x27", slack)]
+        #expect(HotkeyConflicts.conflicts(in: samePosition, hyperIncludesShift: true)
+            == [HotkeyConflict(spec: spec("cmd+key:'"), targets: [chrome, slack], reason: .same)])
+        #expect(HotkeyConflicts.conflicts(in: [binding("cmd+key:'", chrome), binding("cmd+'", slack)], hyperIncludesShift: true).isEmpty)
+        #expect(HotkeyConflicts.conflicts(in: [binding("cmd+key:'", chrome), binding("cmd+key:;", slack)], hyperIncludesShift: true).isEmpty)
+        #expect(HotkeyConflicts.owner(of: spec("hyper+key:1"), in: [binding("ctrl+opt+shift+cmd+key:1", chrome)], except: nil, hyperIncludesShift: true) == chrome)
+    }
+
+    @Test("a layout-aware resolver makes a physical key meet the character key it types")
+    func resolvedCharacterKeys() {
+        let layout: (KeySpec) -> UInt16? = { key in
+            key == .character("k") ? 0x28 : HotkeyConflicts.positionalKeyCode(key)
+        }
+        let bindings = [binding("shift+cmd+k", chrome), binding("shift+cmd+key:k", slack)]
+        #expect(HotkeyConflicts.conflicts(in: bindings, hyperIncludesShift: true, keyCode: layout)
+            == [HotkeyConflict(spec: spec("shift+cmd+k"), targets: [chrome, slack], reason: .same)])
+        #expect(HotkeyConflicts.conflicts(in: bindings, hyperIncludesShift: true).isEmpty)
+        #expect(HotkeyConflicts.owner(of: spec("shift+cmd+key:k"), in: bindings, except: slack, hyperIncludesShift: true, keyCode: layout) == chrome)
+        #expect(HotkeyConflicts.owner(of: spec("shift+cmd+key:k"), in: bindings, except: slack, hyperIncludesShift: true) == nil)
+        #expect(HotkeyConflicts.owner(of: spec("shift+cmd+j"), in: bindings, except: nil, hyperIncludesShift: true, keyCode: layout) == nil)
+    }
+
+    @Test("a named key and a physical key with the same key code are the same")
+    func namedVersusPhysical() {
+        let bindings = [
+            HotkeyBinding(spec: .combo(HotkeyCombo(modifiers: .command, key: .named(.return))), target: chrome),
+            HotkeyBinding(spec: .combo(HotkeyCombo(modifiers: .command, key: .physical(0x24))), target: slack),
+        ]
+        #expect(HotkeyConflicts.conflicts(in: bindings, hyperIncludesShift: true)
+            == [HotkeyConflict(spec: bindings[0].spec, targets: [chrome, slack], reason: .same)])
+        #expect(HotkeyConflicts.positionalKeyCode(.named(.return)) == 0x24)
+        #expect(HotkeyConflicts.positionalKeyCode(.physical(0x27)) == 0x27)
+        #expect(HotkeyConflicts.positionalKeyCode(.character("k")) == nil)
+    }
+
     @Test("a modifier tap cannot coexist with a double tap of that modifier on an overlapping side")
     func tapVersusDoubleTap() {
         let cases: [(String, String, Bool)] = [

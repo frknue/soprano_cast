@@ -56,6 +56,9 @@ struct SnapshotCommandTests {
         #expect(try Command.keyToken("!") == .press(.character("1"), .shift))
         let commandOne = try #require(HotkeySpec(settingsText: "cmd+1"))
         #expect(try Command.keyToken("rec:cmd+1") == .record(commandOne))
+        #expect(try Command.keyToken("cmd+key:'") == .press(.physical(0x27), .command))
+        #expect(try Command.keyToken("key:0x27") == .press(.physical(0x27), []))
+        #expect(try Command.keyToken("rec:cmd+key:z") == .record(.combo(HotkeyCombo(modifiers: .command, key: .physical(0x06)))))
         #expect(try Command.keyToken("rec:double:cmd") == .record(.doubleTap(SidedModifier(.command))))
         #expect(try Command.keyToken("wait") == .wait(milliseconds: 2000))
         #expect(try Command.keyToken("wait:150") == .wait(milliseconds: 150))
@@ -90,7 +93,7 @@ struct SnapshotCommandTests {
         #expect(increasing)
     }
 
-    @Test("recording replays: hyper holds all four modifiers, a double tap fits the double-tap window")
+    @Test("recording replays: hyper holds all four modifiers, a double tap fits the double-tap window, a physical key sends its code")
     func recordingEvents() throws {
         var replay = Command.KeyReplay(hyperIncludesShift: true)
         let hyper = replay.events(for: try Command.keyToken("rec:hyper+k"))
@@ -104,6 +107,12 @@ struct SnapshotCommandTests {
 
         let both = replay.events(for: try Command.keyToken("rec:both:shift"))
         #expect(both[1].sides == [.leftShift, .rightShift])
+
+        let physical = replay.events(for: try Command.keyToken("rec:cmd+key:'"))
+        let keyDown = try #require(physical.first { $0.kind == .keyDown })
+        #expect(keyDown.keyCode == 0x27)
+        #expect(keyDown.baseCharacters == "'")
+        #expect(keyDown.modifiers == .command)
     }
 
     @Test("the default snapshot is the screen at 2x with suggestions listed")
@@ -152,7 +161,7 @@ struct SnapshotCommandTests {
         #expect(recording.edits.isEmpty)
 
         let saved = try render(["--query", "chrome", "--keys", keys + " wait"])
-        #expect(saved.edits == ["set hotkeys.app:com.google.Chrome = \"cmd+2\""])
+        #expect(saved.edits == ["set hotkeys.app:com.google.Chrome = \"cmd+key:2\""])
     }
 
     @Test("the report writes missing values as null")

@@ -187,6 +187,15 @@ struct SettingsResolverTests {
         #expect(hotkeys.count == 5)
     }
 
+    @Test("a key: hotkey names a printable key by position, independent of the layout")
+    func physicalKeyHotkey() {
+        let resolution = resolve(#"{ "hotkeys": { "app:com.microsoft.VSCode": "cmd+key:'" } }"#)
+        #expect(resolution.issues.isEmpty)
+        #expect(resolution.settings?.hotkeys == [
+            ItemID(rawValue: "app:com.microsoft.VSCode"): .combo(HotkeyCombo(modifiers: .command, key: .physical(0x27))),
+        ])
+    }
+
     @Test("a bad hotkey is dropped with a warning")
     func badHotkey() {
         let resolution = resolve(#"{ "hotkeys": { "app:a": "k", "app:b": true } }"#)
