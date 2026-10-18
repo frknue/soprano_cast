@@ -91,8 +91,22 @@ struct LauncherModelBuilderTests {
     @Test("sections are titled by their kind and the placeholder is Raycast's")
     func sectionsAndPlaceholder() {
         let built = model(sections: results([chrome]))
-        #expect(built.sections.map { $0.title } == ["Results"])
+        #expect(built.sections.map { $0.title } == ["results"])
         #expect(built.placeholder == "Search for apps and commands…")
+    }
+
+    @Test("the fallbacks header and rows quote the query; the rows keep their kind label")
+    func fallbackSection() {
+        let google = CastItem(
+            id: LauncherTestItems.searchGoogle, title: "Search Google", subtitle: "Soprano Cast",
+            icon: .glyph(.magnifier), arguments: [ArgumentSpec(name: "Query", placeholder: "Query")]
+        )
+        let sections = results([chrome]) + [ResultSection(kind: .fallbacks, rows: [RankedItem(item: google, score: 0)])]
+        let built = model(query: " gogo ", sections: sections)
+        #expect(built.sections.map { $0.title } == ["results", "use “gogo” with…"])
+        let row = built.sections[1].rows[0]
+        #expect(row.subtitle == "“gogo”")
+        #expect(row.accessory == ItemKind.castCommand.label)
     }
 
     @Test("argument fields show placeholders, secure text and dropdown titles")

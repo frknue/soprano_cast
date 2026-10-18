@@ -19,7 +19,7 @@ public enum BuiltinItems {
         CastItem(
             id: ItemID(kind: .systemCommand, key: command.rawValue),
             title: command.title,
-            subtitle: ItemKind.systemCommand.label,
+            subtitle: "System",
             keywords: keywords(for: command),
             icon: .glyph(command.glyph),
             needsConfirmation: command.needsConfirmation
@@ -30,7 +30,7 @@ public enum BuiltinItems {
         CastItem(
             id: ItemID(kind: .windowCommand, key: command.rawValue),
             title: command.title,
-            subtitle: ItemKind.windowCommand.label,
+            subtitle: "Window Management",
             keywords: ["window"] + keywords(for: command),
             icon: .glyph(.window)
         )
@@ -40,7 +40,7 @@ public enum BuiltinItems {
         CastItem(
             id: ItemID(kind: .castCommand, key: command.rawValue),
             title: command.title,
-            subtitle: ItemKind.castCommand.label,
+            subtitle: "Soprano Cast",
             keywords: keywords(for: command),
             icon: .glyph(command.glyph),
             arguments: arguments(for: command)

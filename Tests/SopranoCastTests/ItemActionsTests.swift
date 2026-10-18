@@ -64,9 +64,13 @@ struct ItemActionsTests {
         #expect(ids(window) == ids(system))
     }
 
-    @Test("the calculator row only copies its answer")
+    @Test("the calculator row only offers its primary Copy Answer")
     func calculatorActions() {
-        #expect(ids(calculator, favorite: true, hotkey: true, alias: true) == [.open, .copyResult])
+        let list = actions(calculator, favorite: true, hotkey: true, alias: true)
+        #expect(list.map { $0.id } == [.open])
+        #expect(list.map { $0.title } == ["Copy Answer"])
+        #expect(ItemActions.secondary(for: calculator) == nil)
+        #expect(ItemActions.tertiary(for: calculator) == nil)
     }
 
     @Test("favorites flip the favorite title and offer moves only where possible")
@@ -132,7 +136,7 @@ struct ItemActionsTests {
         #expect(ItemActions.secondary(for: app)?.id == .showInFinder)
         #expect(ItemActions.secondary(for: quicklink)?.id == .copyLink)
         #expect(ItemActions.secondary(for: script)?.id == .editScript)
-        #expect(ItemActions.secondary(for: calculator)?.id == .copyResult)
+        #expect(ItemActions.secondary(for: calculator) == nil)
         #expect(ItemActions.secondary(for: system) == nil)
         #expect(ItemActions.secondary(for: app)?.shortcut == HotkeyCombo(modifiers: .command, key: .named(.return)))
         #expect(ItemActions.tertiary(for: app)?.id == .copyPath)
@@ -151,7 +155,6 @@ struct ItemActionsTests {
             .showInFinder: character([.shift, .command], "o"),
             .copyPath: character([.shift, .command], "c"),
             .copyLink: character([.shift, .command], "c"),
-            .copyResult: character([.shift, .command], "c"),
             .copyBundleID: character([.option, .command], "c"),
             .copyName: character([.option, .command], "c"),
             .editScript: character(.command, "e"),

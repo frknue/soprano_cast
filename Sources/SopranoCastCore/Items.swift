@@ -74,11 +74,11 @@ public enum ItemKind: String, CaseIterable, Sendable {
     public var label: String {
         switch self {
         case .application: "Application"
-        case .systemCommand: "System"
-        case .windowCommand: "Window Management"
+        case .systemCommand: "Command"
+        case .windowCommand: "Command"
         case .quicklink: "Quicklink"
         case .script: "Script Command"
-        case .castCommand: "Soprano Cast"
+        case .castCommand: "Command"
         case .calculator: "Calculator"
         }
     }

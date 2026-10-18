@@ -3,19 +3,21 @@ import Foundation
 /// What the Action Panel (⌘K), ↵ / ⌘↵ / ⌥↵ and the in-launcher shortcuts do for an item.
 public enum ItemActions {
     /// The Action Panel for an item, in this order (only those that apply):
-    /// primary, secondary, showInFinder, copyPath/copyLink/copyResult, copyBundleID/copyName,
+    /// primary, secondary, showInFinder, copyPath/copyLink, copyBundleID/copyName,
     /// quitApplication + hideApplication (running apps), editScript (scripts), toggleFavorite,
     /// moveFavoriteUp/Down (favorites not already first/last), setHotkey, deleteHotkey
     /// (when set), setAlias, deleteAlias (when set), disableCommand.
     ///
     /// The primary and secondary rows show ↵ and ⌘↵; an action already listed as one of them
-    /// isn't repeated. The calculator row gets no favorite, hotkey, alias or disable actions
-    /// (it is never stored in settings).
+    /// isn't repeated. The calculator row gets only its primary ("Copy Answer"): it has
+    /// nothing else to offer and is never stored in settings.
     public static func actions(for item: CastItem, isRunning: Bool, isFavorite: Bool,
                                canMoveFavoriteUp: Bool, canMoveFavoriteDown: Bool,
                                hasHotkey: Bool, hasAlias: Bool) -> [ItemAction] {
-        var actions = [primary(for: item)]
-        if let secondary = secondary(for: item) { actions.append(secondary) }
+        let open = primary(for: item)
+        guard item.kind != .calculator else { return [open] }
+        var actions = [open]
+        if let second = secondary(for: item) { actions.append(second) }
         func add(_ id: ItemActionID) {
             guard !actions.contains(where: { $0.id == id }) else { return }
             actions.append(action(id))
@@ -28,19 +30,14 @@ public enum ItemActions {
         switch kind {
         case .application, .script: add(.copyPath)
         case .quicklink: add(.copyLink)
-        case .calculator: add(.copyResult)
-        case .systemCommand, .windowCommand, .castCommand, nil: break
+        case .systemCommand, .windowCommand, .castCommand, .calculator, nil: break
         }
-        if kind != .calculator {
-            add(isApp && hasBundleID(item) ? .copyBundleID : .copyName)
-        }
+        add(isApp && hasBundleID(item) ? .copyBundleID : .copyName)
         if isApp && isRunning {
             add(.quitApplication)
             add(.hideApplication)
         }
         if kind == .script { add(.editScript) }
-        guard kind != .calculator else { return actions }
-
         actions.append(favoriteAction(isFavorite: isFavorite))
         if isFavorite && canMoveFavoriteUp { add(.moveFavoriteUp) }
         if isFavorite && canMoveFavoriteDown { add(.moveFavoriteDown) }
@@ -60,8 +57,8 @@ public enum ItemActions {
 
     /// ↵ / ⌘↵ / ⌥↵ for an item. Primary: open ("Open Application", "Open Quicklink", "Run
     /// Script", "Run Command", calculator "Copy Answer"). Secondary: app showInFinder,
-    /// quicklink copyLink, script editScript, calculator copyResult, else nil. Tertiary:
-    /// app copyPath, else nil. Their `shortcut` is ↵, ⌘↵ and ⌥↵.
+    /// quicklink copyLink, script editScript, else nil. Tertiary: app copyPath, else nil.
+    /// Their `shortcut` is ↵, ⌘↵ and ⌥↵.
     public static func primary(for item: CastItem) -> ItemAction {
         let title = switch item.kind {
         case .application: "Open Application"
@@ -78,8 +75,7 @@ public enum ItemActions {
         case .application: .showInFinder
         case .quicklink: .copyLink
         case .script: .editScript
-        case .calculator: .copyResult
-        case .systemCommand, .windowCommand, .castCommand, nil: nil
+        case .systemCommand, .windowCommand, .castCommand, .calculator, nil: nil
         }
         return id.map { action($0, shortcut: returnKey(.command)) }
     }
@@ -89,21 +85,22 @@ public enum ItemActions {
         return action(.copyPath, shortcut: returnKey(.option))
     }
 
-    /// In-launcher shortcuts: open ⌘O, showInFinder ⇧⌘O, copyPath/copyLink/copyResult ⇧⌘C,
+    /// In-launcher shortcuts: open ⌘O, showInFinder ⇧⌘O, copyPath/copyLink ⇧⌘C,
     /// copyBundleID/copyName ⌥⌘C, editScript ⌘E, toggleFavorite ⌘F, moveFavoriteUp ⇧⌘↑,
-    /// moveFavoriteDown ⇧⌘↓, disableCommand ⇧⌘D. Others have none.
+    /// moveFavoriteDown ⇧⌘↓, disableCommand ⇧⌘D. Others have none (`copyResult` is listed
+    /// by no item: the calculator's ↵ already copies).
     public static func shortcut(for action: ItemActionID) -> HotkeyCombo? {
         switch action {
         case .open: combo(.command, "o")
         case .showInFinder: combo([.shift, .command], "o")
-        case .copyPath, .copyLink, .copyResult: combo([.shift, .command], "c")
+        case .copyPath, .copyLink: combo([.shift, .command], "c")
         case .copyBundleID, .copyName: combo([.option, .command], "c")
         case .editScript: combo(.command, "e")
         case .toggleFavorite: combo(.command, "f")
         case .moveFavoriteUp: HotkeyCombo(modifiers: [.shift, .command], key: .named(.up))
         case .moveFavoriteDown: HotkeyCombo(modifiers: [.shift, .command], key: .named(.down))
         case .disableCommand: combo([.shift, .command], "d")
-        case .quitApplication, .hideApplication, .setHotkey, .deleteHotkey, .setAlias, .deleteAlias: nil
+        case .copyResult, .quitApplication, .hideApplication, .setHotkey, .deleteHotkey, .setAlias, .deleteAlias: nil
         }
     }
 

@@ -11,11 +11,11 @@ public enum SectionKind: String, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .calculator: "Calculator"
-        case .favorites: "Favorites"
-        case .suggestions: "Suggestions"
-        case .results: "Results"
-        case .fallbacks: "Use with"
+        case .calculator: "calculator"
+        case .favorites: "favorites"
+        case .suggestions: "suggestions"
+        case .results: "results"
+        case .fallbacks: "use with"
         }
     }
 }

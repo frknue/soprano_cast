@@ -46,9 +46,10 @@ enum LauncherModelBuilder {
             placeholder: placeholder,
             arguments: argumentFields(arguments, values: argumentValues),
             sections: sections.map { section in
-                SectionViewModel(
-                    title: section.kind.title,
-                    rows: section.rows.map { row($0, settings: settings, icon: icon) }
+                let fallbackQuery = section.kind == .fallbacks ? trimmed(query) : nil
+                return SectionViewModel(
+                    title: fallbackQuery.map(fallbacksTitle(query:)) ?? section.kind.title,
+                    rows: section.rows.map { row($0, settings: settings, fallbackQuery: fallbackQuery, icon: icon) }
                 )
             },
             selectedIndex: selected == nil ? nil : selectedIndex,
@@ -66,11 +67,32 @@ enum LauncherModelBuilder {
 
     /// "No results" with a query, "Type to search apps and commands" without.
     static func emptyText(query: String) -> String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? emptyQueryText : noResultsText
+        trimmed(query).isEmpty ? emptyQueryText : noResultsText
     }
 
-    static func row(_ ranked: RankedItem, settings: CastSettings, icon: (ItemIcon) -> NSImage) -> RowViewModel {
+    /// The fallbacks section's header: `use “<query>” with…`.
+    static func fallbacksTitle(query: String) -> String {
+        "use \(quoted(query)) with…"
+    }
+
+    /// - Parameter fallbackQuery: the trimmed query when the row is in the fallbacks
+    ///   section; the row then shows it as its subtitle and its kind's label as accessory.
+    static func row(
+        _ ranked: RankedItem,
+        settings: CastSettings,
+        fallbackQuery: String? = nil,
+        icon: (ItemIcon) -> NSImage
+    ) -> RowViewModel {
         let item = ranked.item
+        let subtitle: String
+        let accessory: String
+        if let fallbackQuery {
+            subtitle = quoted(fallbackQuery)
+            accessory = item.kind?.label ?? ""
+        } else {
+            subtitle = accessoryUsesSubtitle(item) ? "" : item.subtitle
+            accessory = Self.accessory(for: item)
+        }
         return RowViewModel(
             id: item.id,
             title: item.title,
@@ -78,12 +100,20 @@ enum LauncherModelBuilder {
                 guard range.lowerBound >= item.title.startIndex, range.upperBound <= item.title.endIndex else { return nil }
                 return NSRange(range, in: item.title)
             },
-            subtitle: accessoryUsesSubtitle(item) ? "" : item.subtitle,
+            subtitle: subtitle,
             icon: icon(item.icon),
-            accessory: accessory(for: item),
+            accessory: accessory,
             alias: settings.aliases[item.id],
             hotkeyKeys: settings.hotkeys[item.id]?.keycaps ?? []
         )
+    }
+
+    private static func trimmed(_ query: String) -> String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func quoted(_ text: String) -> String {
+        "“\(text)”"
     }
 
     /// The trailing label: the kind's label; the calculator's expression; a script's
