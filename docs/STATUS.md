@@ -10,35 +10,42 @@ every Raycast shape and the Hyper key; system commands; window management; quick
 Raycast-format script commands; command line. `docs/ROADMAP.md` lists what is deliberately
 not copied.
 
-## In progress (phase 1)
+## Done (phase 1)
 
-All modules are being written in parallel against `docs/ARCHITECTURE.md`:
-
-- Core (`SopranoCastCore`): key and hotkey parsing, recorder, modifier gesture detector,
-  conflicts; settings resolver, template and comment-preserving editor; search matcher,
-  ranker, frecency, search history, calculator; built-in items, item actions, quicklink
-  templates, script metadata and output, window layout; launcher key router and result
-  navigator.
-- System: app catalog, icons, app actions, quicklink opener, system command runner,
-  script catalog and runner, item runner, window manager, hotkey center (Carbon + event
-  tap), keyboard layout, Hyper key.
+- Core (`SopranoCastCore`): key and hotkey parsing (named, physical and character keys),
+  recorder, modifier gesture detector, conflicts; settings resolver with per-key warnings,
+  commented template and comment-preserving editor; search matcher, ranker, frecency,
+  search history, calculator; built-in items, item actions, quicklink templates, script
+  metadata and output, window layout; launcher key router and result navigator.
+- System: app catalog (Spotlight plus a direct scan), icons, app actions, quicklink opener,
+  system command runner, script catalog and runner, item runner, window manager, hotkey
+  center (Carbon + event tap, re-registered on layout changes), keyboard layout, Hyper key.
 - Launcher: `LauncherController`, model builder, `LauncherWindow` with search bar, list,
   footer, Action Panel, recorder, alias editor, confirmation, output and HUD.
 - Shell: app delegate, menu bar, login item, settings and theme centers, app state store,
   permissions window, CLI server/client.
 - Fixtures and the offscreen `snapshot` harness; packaging, signing and sync scripts;
   docs.
+- Builds; 393 tests pass. Visual QA through the `snapshot` harness done (root, results,
+  calculator, Action Panel, recorder with conflicts, alias editor, confirmation, output,
+  arguments, fallbacks).
+- Window layout: Move Up / Down / Left / Right center along the edge; Previous / Next
+  Display keep the aspect ratio (Raycast's "Center Window" / "Keep Aspect Ratio").
+- The user's Raycast setup, read from Raycast's Settings window, is migrated into
+  `~/.config/soprano-cast/settings.json`: the user's 11 app hotkeys (by key position,
+  `key:`), `windowManagement.halves: cycleSizes` and `app.showMenuBarIcon: false`; Raycast's
+  other settings already equal the defaults.
 
 ## Next
 
-1. Verify: `swift build`, `swift test`, fix-ups across modules.
-2. Raycast import from Furkan's `.rayconfig` (hotkeys, aliases, favorites, quicklinks).
-3. Visual QA with the `snapshot` harness (root, results, calculator, Action Panel,
-   recorder, alias editor, confirmation, output, HUD).
-4. Install, quit Raycast (or clear its hotkey), grant Accessibility, first live run.
+1. First live run by the user: quit Raycast (and remove it from login items), start
+   Soprano Cast, grant Accessibility, use the migrated hotkeys and Root Search on the real
+   desktop (both keyboard layouts, several displays).
+2. Fixes from that run.
 
 ## Open decisions
 
-- Physical-key hotkeys (Raycast's default) are recorded as key equivalents on the current
-  layout: a character hotkey stores the character the key types without modifiers and is
-  re-resolved to a key code whenever the input source changes.
+- Known upstream issue: the vendored `JSONCText` `removing` drops a trailing comment on the
+  line before a removed last object member (e.g. Remove Hotkey on the last entry of
+  `hotkeys`). The fix belongs in Soprano; then re-run `scripts/sync-soprano-chrome.sh`.
+- Raycast `.rayconfig` import waits for a real export file to build against.

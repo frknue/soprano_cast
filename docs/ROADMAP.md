@@ -1,7 +1,7 @@
 # Roadmap
 
 Soprano Cast copies Raycast's Root Search and hotkeys. What is left out, and why, is listed
-below, followed by what comes next and later.
+below, followed by what is not built yet.
 
 ## Not copied (family conventions)
 
@@ -13,10 +13,10 @@ below, followed by what comes next and later.
 - The extension Store.
 - Raycast themes: Soprano themes, all dark.
 
-## Raycast import (next)
+## Not built yet
 
-- Import hotkeys, aliases, favorites, disabled commands, quicklinks and script directories
-  from a Raycast `.rayconfig` export into settings.json.
+- Raycast `.rayconfig` import — needs a real export to build against (Raycast 1.70's
+  export never wrote a file).
 
 ## Later
 

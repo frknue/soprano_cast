@@ -20,57 +20,70 @@ The installer never restarts a running Soprano Cast; the update applies on the n
 launch. Launch at login is on by default. The icon in the menu bar (a square with a
 slanted beam) means it is running.
 
-The first launch opens the permissions window while Accessibility is missing. App,
-quicklink, script and system-command hotkeys work without it; window management,
-modifier-only and `fn` hotkeys and the Hyper key need it (see [Permissions](#permissions)).
+The first launch asks macOS once for Accessibility and opens the permissions window while
+it is missing. Combo hotkeys like `⌘1` for apps, quicklinks and scripts work without it;
+window management, modifier-only and `fn` hotkeys and the Hyper key need it (see
+[Permissions](#permissions)).
 
 ## The first minutes
 
 1. Press `⌘Space`: the launcher opens on the display with the mouse.
 2. Type a few letters of what you want, e.g. `chr` for Google Chrome. Matching is fuzzy.
-3. `↵` opens the selected row. `⎋` closes the launcher.
+3. `↵` opens the selected row and closes the launcher. `⎋` closes it without running
+   anything.
 4. `⌘K` opens the Action Panel for the selected row: everything you can do with it.
 5. `⇧⌘,` (Configure Command) sets a hotkey or an alias for the selected row. Choose
-   "Set Hotkey", press the keys (e.g. `⌘1`), and it saves after 1.5 s.
+   "Set Hotkey…", press the keys (e.g. `⌘1`), and it saves after 1.5 s.
 6. `⌘F` adds the selected row to Favorites, shown first when the search field is empty.
 
 ## Switching from Raycast
 
-Raycast holds `⌘Space` while it runs, so Soprano Cast's launcher hotkey can't fire until
-you either quit Raycast or clear Raycast's hotkey (Raycast Settings → General → Raycast
-Hotkey). Turn off Spotlight's `⌘Space` too (System Settings → Keyboard → Keyboard
-Shortcuts → Spotlight) if it is still on. Your other Raycast hotkeys also clash while
-Raycast runs. Hotkeys, aliases and favorites are set in Soprano Cast's own settings.json
-or from the Action Panel.
+Raycast and Soprano Cast register the same hotkeys (`⌘Space`, and every hotkey you move
+over), so only one of them gets each. Quit Raycast, and remove it from your login items
+(System Settings → General → Login Items), before starting Soprano Cast. Turn off
+Spotlight's `⌘Space` too (System Settings → Keyboard → Keyboard Shortcuts → Spotlight) if it
+is still on.
+
+Then set your hotkeys again: select the item, `⇧⌘,` → Set Hotkey…, and press the keys; or
+write them under `hotkeys` in settings.json. Aliases and favorites work the same way. There
+is no importer for Raycast's export yet.
 
 ## Root Search
 
-**Sections.** With an empty search field: **Favorites** (in your order) and
-**Suggestions** (up to 6 items you use most, by frecency; favorites excluded, only items
-used at least once). With a query: **Calculator** (when the query is a calculation),
-**Results** (up to 60), and **Fallbacks** (`fallbacks`, by default Search Google) at the
-end. Empty sections are hidden. "No results" shows when nothing matches, "Type to search
-apps and commands" when there is nothing to suggest.
+**Sections.** With an empty search field: **favorites** (in your order) and
+**suggestions** (up to 6 items you use most, by frecency; favorites excluded, only items
+used at least once). With a query: **calculator** (when the query is a calculation),
+**results** (up to 60), and the fallbacks at the end under `use “<query>” with…`
+(`fallbacks`, by default Search Google), each showing your query. Empty sections are
+hidden. "No results" shows when nothing matches, "Type to search apps and commands" when
+there is nothing to suggest.
+
+**Rows.** Each row shows its icon, title (matched letters highlighted), subtitle (an app's
+folder, a quicklink's link, "System" or "Window Management"), an alias badge, and at the
+right its type: Application, Command (system, window and Soprano Cast commands),
+Quicklink, Script Command (or the script's package name), or the calculator's expression.
+The selected row also shows its hotkey.
 
 **Matching and ranking.** Fuzzy, case- and accent-insensitive; several words must all
-match; consecutive letters and word starts score higher, and matched letters are
-highlighted. An alias equal to the query ranks first, an alias starting with the query
-next, then title matches (keywords and subtitle count half). Within a tier, frecency (how
-often and how recently you ran it) and favorites (a small bonus) decide. Disabled items
-never appear.
+match; consecutive letters and word starts score higher. An alias equal to the query ranks
+first, an alias starting with the query next, then title matches (keywords and subtitle
+count half). Within a tier, frecency (how often and how recently you ran it) and favorites
+(a small bonus) decide. Disabled items never appear.
 
 **Aliases.** A short name for an item (`gc` for Google Chrome): lowercase letters, digits
 and spaces. Typing the alias ranks the item first and shows the alias as a badge; typing
-the alias plus a space on an item with arguments jumps to its first argument.
+the alias plus a space on an item with arguments selects it and jumps to its first
+argument.
 
-**Calculator.** Type an expression: `+ - * / × ÷ ^ %`, parentheses, unary minus, decimals
-with `.` or your locale's decimal separator, `sqrt abs round floor ceil sin cos tan log
-ln exp` (`log` is base 10), constants `pi` `π` `e`. The answer shows as the first row;
-`↵` copies it (Copy Answer). Division by zero and other invalid results show nothing.
+**Calculator.** Type an expression: `+ - * / × ÷ ^`, a trailing `%` (percent: `50%` is
+0.5), parentheses, unary minus, decimals with `.` or your locale's decimal separator,
+`sqrt abs round floor ceil sin cos tan log ln exp` with parentheses (`log` is base 10,
+angles in radians), constants `pi` `π` `e`. `^` binds tightest and groups from the right
+(`2^3^2` = 512). The answer shows as the first row, formatted for your locale; its only
+action is Copy Answer (`↵`). Division by zero and other invalid results show nothing.
 
-**Fallbacks.** Rows offered after the results for any query ("Use “x” with …"). Running
-one passes the query as its first argument, so Search Google searches for what you typed.
-Set them with `fallbacks`.
+**Fallbacks.** Running a fallback row passes the query as its first argument, so Search
+Google searches for what you typed. Set them with `fallbacks`.
 
 **Arguments.** Quicklinks and script commands with arguments show argument fields inline
 in the search bar (up to 3; text, password or dropdown). `⇥` / `⇧⇥` move between the
@@ -79,11 +92,13 @@ empty one ("Fill in <name>" when it already has focus). Values stay while the se
 does.
 
 **History.** `↑` on the first row (or an empty list) puts the previous search back in the
-field, `↓` on the last row the next one; typing leaves the history. The last 50 searches
-you ran something from are kept.
+field, `↓` on the last row the next one (past the newest, what you had typed); typing
+leaves the history. The last 50 searches you ran something from are kept.
 
-**Pop to root.** Reopening the launcher within `launcher.popToRootSeconds` (90 s) shows
-it exactly as you left it; later it starts fresh. `⌘⎋` clears it right away.
+**Closing and reopening.** Running something closes the launcher, and the next opening
+starts from Root Search, like Raycast. After `⎋`, `⌘W` or clicking away, reopening within
+`launcher.popToRootSeconds` (90 s) shows the search, selection and arguments as you left
+them; later it starts fresh. `⌘⎋` clears it right away.
 
 ## Launcher shortcuts
 
@@ -94,8 +109,8 @@ it exactly as you left it; later it starts fresh. `⌘⎋` clears it right away.
 | `⌃K` / `⌃J` | Previous / next row (`launcher.navigation`: `vim`, `both`) |
 | `⌥↑` / `⌥↓` | Page up / down |
 | `⌘↑` / `⌘↓` | Previous / next section |
-| `↵` | Primary action (open, run, copy answer) |
-| `⌘↵` | Secondary action (Show in Finder, Copy Link, Edit Script, Copy Result) |
+| `↵` | Primary action (Open Application, Open Quicklink, Run Script, Run Command, Copy Answer) |
+| `⌘↵` | Secondary action (apps: Show in Finder; quicklinks: Copy Link; scripts: Edit Script) |
 | `⌥↵` | Tertiary action (apps: Copy Path) |
 | `⌘K` | Action Panel |
 | `⇧⌘,` | Configure Command (hotkey and alias) |
@@ -103,14 +118,16 @@ it exactly as you left it; later it starts fresh. `⌘⎋` clears it right away.
 | `⌘F` | Add to / remove from Favorites |
 | `⇧⌘↑` / `⇧⌘↓` | Move favorite up / down |
 | `⇧⌘D` | Disable command (hides it from Root Search) |
-| `⇥` / `⇧⇥` | Next / previous argument field |
+| `⇥` / `⇧⇥` | Next / previous argument field (items with arguments) |
 | `⎋` | Close the top overlay, else close the launcher |
 | `⌘⎋` | Pop to root: clear the search, arguments and overlays |
 | `⌘W` | Close the launcher |
 
-The Action Panel shortcuts below also work straight from the list. Everything else
-(typing, `⌃F`/`⌃B`, `⌘A`/`⌘C`/`⌘V`, `←`/`→`) edits the search field. With
-`closeOnFocusLoss` on, clicking another app closes the launcher.
+The Action Panel shortcuts below (`⌘O`, `⇧⌘O`, `⇧⌘C`, `⌥⌘C`, `⌘E`) also work straight
+from the list. Everything else (typing, `⌃F`/`⌃B`, `⌘A`/`⌘C`/`⌘V`, `←`/`→`) edits the
+search field. Holding `↓` scrolls, but holding `↵` never runs twice. A click selects a
+row and a double click runs it. With `launcher.closeOnFocusLoss` on, clicking another app
+closes the launcher.
 
 ## Action Panel
 
@@ -118,77 +135,105 @@ The Action Panel shortcuts below also work straight from the list. Everything el
 
 | Action | Shortcut | For |
 |---|---|---|
-| Primary: Open Application / Open Quicklink / Run Script / Run Command / Copy Answer | `↵` (`⌘O`) | everything |
-| Secondary | `⌘↵` | see above |
-| Show in Finder | `⇧⌘O` | apps, scripts |
-| Copy Path / Copy Link / Copy Result | `⇧⌘C` | apps / quicklinks / calculator |
-| Copy Bundle Identifier / Copy Name | `⌥⌘C` | apps / other items |
+| Open Application / Open Quicklink / Run Script / Run Command / Copy Answer | `↵` (also `⌘O`) | everything |
+| Show in Finder / Copy Link / Edit Script (the secondary action) | `⌘↵` | apps / quicklinks / scripts |
+| Show in Finder | `⇧⌘O` | scripts (apps have it as `⌘↵`) |
+| Copy Path | `⇧⌘C` | apps, scripts |
+| Copy Bundle Identifier | `⌥⌘C` | apps |
+| Copy Name | `⌥⌘C` | everything else |
 | Quit Application, Hide Application | — | running apps |
-| Edit Script | `⌘E` | scripts |
-| Add to / Remove from Favorites | `⌘F` | |
-| Move Favorite Up / Down | `⇧⌘↑` / `⇧⌘↓` | favorites not already first / last |
-| Set Hotkey | — | |
+| Add to Favorites / Remove from Favorites | `⌘F` | |
+| Move Up in Favorites / Move Down in Favorites | `⇧⌘↑` / `⇧⌘↓` | favorites not already first / last |
+| Set Hotkey… | — | |
 | Remove Hotkey | — | when one is set |
-| Set Alias | — | |
+| Set Alias… | — | |
 | Remove Alias | — | when one is set |
 | Disable Command | `⇧⌘D` | |
 
-Type to filter the actions, `↑`/`↓` (and the navigation keys) to move, `↵` to run the
-selected action, `⌘↵` the secondary action, `⌘K` or `⎋` to close. `⇧⌘,` opens just the
-Configure Command part: Set Hotkey, Remove Hotkey, Set Alias, Remove Alias.
+The calculator row has only Copy Answer. Destructive actions (Quit Application, Remove
+from Favorites, Remove Hotkey, Remove Alias, Disable Command) are drawn in red. Type to
+filter the actions, `↑`/`↓` (and the navigation keys) to move, `↵` to run the selected
+action, `⌘↵` the secondary action, `⌘K` or `⎋` to close. `⇧⌘,` opens just the Configure
+Command part: Set Hotkey…, Remove Hotkey, Set Alias…, Remove Alias.
 
-Commands marked for confirmation (Restart, Shut Down, Log Out, Empty Trash, Quit All
-Applications, script commands with `needsConfirmation`) ask first: `↵` confirms, `⎋`
-cancels.
+Copy Link copies the quicklink's link as written in settings.json, placeholders included.
+
+**Set Alias…** opens a field prefilled with the current alias; it lowercases as you type,
+shows "Use only a–z, 0–9 and spaces" for anything else, and `↵` saves (an empty alias
+removes it).
+
+**Confirmation.** Restart, Shut Down, Log Out, Empty Trash, Quit All Applications and
+script commands with `needsConfirmation` ask "Are you sure?" first, also when run from a
+hotkey: `↵` (the button with the command's name) confirms, `⎋` cancels.
 
 ## Hotkeys
 
 Every item (app, system command, window command, quicklink, script command, Soprano Cast
 command) can have a global hotkey. It runs the item without showing the launcher; an item
-whose required arguments are empty opens the launcher on it instead. Window commands act
-on the frontmost window.
+whose required arguments are empty, or that asks for confirmation, opens the launcher on
+it instead. Window commands act on the frontmost window.
 
 | Shape | settings.json | Keycaps |
 |---|---|---|
-| Modifiers + key | `"cmd+1"`, `"cmd+shift+k"`, `"ctrl+opt+left"`, `"fn+a"` | `⌘` `1` |
+| Modifiers + key | `"cmd+key:1"`, `"cmd+shift+k"`, `"ctrl+opt+left"`, `"fn+a"` | `⌘` `1` |
 | Function key alone (F13–F20) | `"f13"` | `F13` |
-| Hyper + key | `"hyper+1"` | `✦` `1` |
+| Hyper + key | `"hyper+1"`, `"hyper+key:k"` | `✦` `1` |
 | Modifier tap | `"rcmd"`, `"lopt"`, `"fn"`, `"cmd+opt"` (several held, then released) | `R⌘` |
 | Double tap | `"double:cmd"`, `"double:rshift"` | `⌘` `⌘` |
 | Both sides | `"both:cmd"` (not `fn`) | `L⌘` `R⌘` |
 
-- Modifiers: `cmd`/`command`/`⌘`, `opt`/`option`/`alt`/`⌥`, `ctrl`/`control`/`⌃`,
-  `shift`/`⇧`, `fn`/`function`, joined with `+`; case and spaces don't matter. Sided:
-  `lcmd rcmd lopt ropt lctrl rctrl lshift rshift` (plain names match either side).
-- Keys: `tab`, `space`, `return`, `escape`, `delete`, `forwardDelete`, `left`, `right`,
-  `up`, `down`, `home`, `end`, `pageUp`, `pageDown`, `f1`…`f20`; aliases `enter`, `esc`,
-  `backspace`, `spacebar`. Any other single character is the key that types it on your
-  current layout, so `cmd+shift+1` is `⌘⇧1`, not `⌘!`.
-- A combo without a modifier is only allowed for F13–F20. A tap fires when exactly its
-  modifiers go down and up within 0.5 s with no other key; a double tap needs the second
-  press within 0.35 s of the first release.
+**Keys by position or by character.** A printable key can be named two ways:
 
-**Recording.** Set Hotkey (in `⌘K` or `⇧⌘,`) opens the recorder. Press the combo, tap the
-modifier(s), tap one twice, or hold both sides; the keycaps show what was recorded, and it
-saves after 1.5 s. `↵` saves now, `⌫` removes the hotkey, `⎋` cancels. Holding `⌃⌥⇧⌘`
-records those four modifiers, not `hyper`; write `hyper+…` in settings.json for Hyper
-hotkeys. While recording, every other hotkey is paused, so `⌘1` reaches the recorder.
+- **By position**, `key:<name>`: the key at that place on a US keyboard, whatever your
+  current layout types there. `cmd+key:'` is the key right of L on every layout, so it
+  keeps working when you switch between ABC and German (where it types `ä`). Names: `a`–`z`,
+  `0`–`9`, `-` `=` `[` `]` `\` `;` `'` `,` `.` `/` `` ` `` and `§` (the ISO key above Tab),
+  or a key code like `key:0x27`. This is Raycast's default, and what the recorder saves:
+  recording `⌘1` writes `cmd+key:1`.
+- **By character**, the character itself (`cmd+'`, `cmd+k`): the key that types that
+  character on your current layout, looked up again whenever the layout changes.
+
+Keycaps show what your current layout types on the key (`⌘` `Ä` for `cmd+key:'` on
+German), modifiers in the order `⌃⌥⇧⌘`: `⇧⌘K`.
+
+- Modifiers: `cmd`/`command`/`⌘`, `opt`/`option`/`alt`/`⌥`, `ctrl`/`control`/`⌃`,
+  `shift`/`⇧`, `fn`/`function`, joined with `+`; case and spaces don't matter; each at
+  most once. Sided names for taps: `l` or `r` before any of them (`lcmd rcmd lopt ropt
+  ralt lctrl rctrl lshift rshift`); plain names match either side; `fn` has no sides.
+  Combos take plain names only.
+- Named keys: `tab`, `space`, `return`, `escape`, `delete`, `forwardDelete`, `left`,
+  `right`, `up`, `down`, `home`, `end`, `pageUp`, `pageDown`, `f1`…`f20`; aliases `enter`,
+  `esc`, `backspace`, `spacebar`. `cmd++` is `⌘` and the plus key.
+- A combo without a modifier is only allowed for F13–F20. `fn` with an arrow, Home/End,
+  Page Up/Down, Forward Delete or an F-key can't be bound (macOS sets `fn` on those keys
+  by itself). A tap fires when exactly its modifiers go down and up within 0.5 s with no
+  other key; a double tap needs the second press within 0.35 s of the first release.
+
+**Recording.** Set Hotkey… (in `⌘K` or `⇧⌘,`) opens the recorder, showing the current
+hotkey or "recording…". Press the combo, tap the modifier(s), tap one twice, or hold both
+sides; the keycaps show what was recorded, and it saves after 1.5 s. `↵` saves now, `⌫`
+removes the hotkey, `⎋` cancels. Holding `⌃⌥⇧⌘` records those four modifiers, not
+`hyper`; write `hyper+…` in settings.json for Hyper hotkeys. While recording, every other
+hotkey is paused, so `⌘1` reaches the recorder (and `⌘W` / `⌘⎋` record like any combo).
 
 **Conflicts.** The recorder shows "Used by <title>" in red when another item has the same
 hotkey (or one that can't coexist with it: a `⌥` tap with a `⌥⌥` double tap, an any-side
 `⌘` tap with both-sided `⌘`); saving takes the hotkey over and removes it from the other
 item. The launcher's own hotkey shows "Used by Soprano Cast" and can't be taken. In
-settings.json, of two items with the same hotkey the later one (by item id) is dropped with
-a warning, and anything clashing with `launcher.hotkey` is dropped. Hotkeys that fail to
-register (taken by another app, or needing Accessibility) show as "N hotkeys need
-attention" in the menu.
+settings.json, of two items with the same hotkey (Hyper expanded) the later one (by item
+id) is dropped with a warning, and anything clashing with `launcher.hotkey` is dropped.
+Hotkeys that fail show as "N hotkeys need attention" in the menu, with the reason in its
+tooltip: "already registered" (another app has it), "used by macOS" (an enabled macOS
+shortcut; it works once you turn that off), "no key types <c> on this layout", "needs
+Accessibility".
 
 **Hyper key.** `hyperKey.trigger` turns a key into Hyper: `capsLock`, `rightCommand`,
-`rightOption`, `rightControl`, `rightShift` or `f18`. While it is held, every key gets
-`⌃⌥⇧⌘` (`⌃⌥⌘` with `includeShift: false`), so `hyper+1` hotkeys fire. With the Caps Lock
-trigger, `quickPress` decides what tapping it alone does: `nothing`, `toggleCapsLock` or
-`escape`. The trigger is remapped with `hidutil`; the mapping is removed when Soprano Cast
-quits and resets at logout. Needs Accessibility.
+`rightOption`, `rightControl`, `rightShift` or `f18` (a key that already sends F18). While
+it is held, every key gets `⌃⌥⇧⌘` (`⌃⌥⌘` with `includeShift: false`), so `hyper+…`
+hotkeys fire. With the Caps Lock trigger, `quickPress` decides what tapping it alone does:
+`nothing`, `toggleCapsLock` or `escape`. The trigger is remapped to F18 with `hidutil`,
+next to any key mappings you already have; quitting Soprano Cast restores your mappings,
+and macOS resets them at logout. Needs Accessibility.
 
 ## Built-in commands
 
@@ -207,7 +252,7 @@ quits and resets at logout. Needs Accessibility.
 | Toggle System Appearance | `toggleSystemAppearance` |
 | Quit All Applications (asks first; keeps Finder and Soprano Cast) | `quitAllApplications` |
 | Hide All Apps Except Frontmost | `hideOtherApplications` |
-| Toggle Hidden Files (in Finder) | `toggleHiddenFiles` |
+| Toggle Hidden Files (in Finder; relaunches Finder) | `toggleHiddenFiles` |
 
 **Window Management** (`window:<id>`), on the frontmost window:
 
@@ -216,23 +261,30 @@ quits and resets at logout. Needs Accessibility.
 | Toggle Fullscreen, Maximize, Almost Maximize (90 %), Maximize Height, Maximize Width | `toggleFullscreen` `maximize` `almostMaximize` `maximizeHeight` `maximizeWidth` |
 | Left Half, Right Half, Top Half, Bottom Half, Center Half | `leftHalf` `rightHalf` `topHalf` `bottomHalf` `centerHalf` |
 | Center, Reasonable Size (60 %, at most 1025 × 900), Make Larger, Make Smaller, Restore | `center` `reasonableSize` `makeLarger` `makeSmaller` `restore` |
-| Move Up, Move Down, Move Left, Move Right (to that edge, same size) | `moveUp` `moveDown` `moveLeft` `moveRight` |
+| Move Up, Move Down, Move Left, Move Right | `moveUp` `moveDown` `moveLeft` `moveRight` |
 | First Third, First Two Thirds, Center Third, Last Two Thirds, Last Third | `firstThird` `firstTwoThirds` `centerThird` `lastTwoThirds` `lastThird` |
 | First Fourth, Second Fourth, Third Fourth, Last Fourth | `firstFourth` `secondFourth` `thirdFourth` `lastFourth` |
 | Top Left / Top Right / Bottom Left / Bottom Right Quarter | `topLeftQuarter` `topRightQuarter` `bottomLeftQuarter` `bottomRightQuarter` |
 | Top Left / Top Center / Top Right / Bottom Left / Bottom Center / Bottom Right Sixth | `topLeftSixth` `topCenterSixth` `topRightSixth` `bottomLeftSixth` `bottomCenterSixth` `bottomRightSixth` |
-| Previous Display, Next Display (displays ordered left to right) | `previousDisplay` `nextDisplay` |
+| Previous Display, Next Display | `previousDisplay` `nextDisplay` |
 
-Restore returns the window to its frame before the last command. Make Larger / Smaller
-grow or shrink by 10 % of the display around the window's center. `windowManagement.gap`
-leaves that many points at the display edges and between regions. `windowManagement.halves`
-decides what Left / Right Half do on a window that already is that half: `stay`,
-`cycleSizes` (½ → ⅔ → ⅓ → ½) or `moveToDisplay` (on to the next display in that
-direction).
+- Move Up / Down / Left / Right keep the window's size, push it against that edge and
+  center it along the edge.
+- Previous / Next Display move the window to the display to the left / right (wrapping
+  around), at the same relative position and keeping its aspect ratio; it shrinks when the
+  other display is smaller.
+- Restore returns the window to its frame before the last command that changed it.
+- Make Larger / Smaller grow or shrink by 10 % of the display around the window's center.
+- `windowManagement.gap` leaves that many points at the display edges and between regions
+  (Almost Maximize and Reasonable Size ignore it).
+- `windowManagement.halves` decides what Left / Right Half do on a window that already is
+  that half: `stay`, `cycleSizes` (½ → ⅔ → ⅓ → ½) or `moveToDisplay` (on to the opposite
+  half of the next display in that direction; on the outermost display it stays).
 
 **Soprano Cast** (`cast:<id>`): Soprano Cast Settings (`openSettings`, opens
 settings.json), Reload Script Directories (`reloadScripts`), Search Google
-(`searchGoogle`), Search DuckDuckGo (`searchDuckDuckGo`), Quit Soprano Cast (`quit`).
+(`searchGoogle`), Search DuckDuckGo (`searchDuckDuckGo`), Quit Soprano Cast (`quit`). The
+two search commands take a Query argument.
 
 ## Quicklinks
 
@@ -248,20 +300,21 @@ A quicklink opens a URL, file, folder or deeplink, filled in from arguments:
 
 - `id` (`[a-z0-9-]`, unique; the item id is `quicklink:<id>`), `name` and `link` are
   required; `openWith` is a bundle id, app name or app path (default: the system's choice);
-  `icon` an emoji or image path.
+  `icon` an emoji or an image path starting with `/` or `~`.
 - Placeholders: `{argument name="x"}` (one argument field per name, at most 3; add
   `default="y"` to make it optional), `{argument}` (named "Query"), legacy `{Query}` /
-  `{query}`, `{clipboard}`, `{date}` (yyyy-MM-dd), `{time}` (HH:mm), `{uuid}`.
-- Values are percent-encoded when the link has a URL scheme and inserted raw into file
-  paths; a leading `~` is your home folder.
-- `⌘↵` copies the expanded link instead of opening it.
+  `{query}`, `{clipboard}`, `{date}` (yyyy-MM-dd), `{time}` (HH:mm), `{uuid}`. Attributes
+  take single or double quotes in any order; anything else in braces stays as written.
+- When the link has a URL scheme, every value is percent-encoded like JavaScript's
+  `encodeURIComponent` (only letters, digits and `- _ . ! ~ * ' ( )` stay); in file paths
+  values go in raw. `~` or a leading `~/` is your home folder. A file link must exist.
 
 ## Script commands
 
 Soprano Cast runs [Raycast script commands](https://github.com/raycast/script-commands)
 unchanged. Put scripts in a folder listed in `scriptDirectories` (files directly in it and
-one level of subfolders; names containing `.template.` are skipped). Folders are watched,
-or run Reload Script Directories.
+one level of subfolders; hidden files and names containing `.template.` are skipped).
+Folders are watched; Reload Script Directories rescans them and reruns inline scripts.
 
 ```bash
 #!/bin/bash
@@ -278,34 +331,43 @@ or run Reload Script Directories.
 echo "Hello, $1"
 ```
 
-- Required: `schemaVersion` (1), `title`, `mode`. Optional: `packageName` (shown as the
-  subtitle; default the folder name), `icon` (emoji, `https` URL, or a path relative to the
-  script), `currentDirectoryPath` (default the script's folder), `needsConfirmation`,
-  `refreshTime` (`10s`, `1m`, `12h`, `1d`; at least 10 s), `argument1`…`argument3`
-  (`type` `text`, `password` or `dropdown`, `placeholder`, `optional`, `percentEncoded`,
-  `data` for dropdowns), `description`. `iconDark` is ignored. Comments may start with `#`
-  or `//`.
+- Required: `schemaVersion` (1), `title`, `mode`. Optional: `packageName` (shown at the
+  right of the row; default the folder name, or the subfolder's), `icon` (emoji, `https`
+  URL, or a path relative to the script), `currentDirectoryPath` (default the script's
+  folder), `needsConfirmation` (`true` or `false`), `refreshTime` (`10s`, `1m`, `12h`,
+  `1d`; at least 10 s), `argument1`…`argument3` (`type` `text`, `password` or
+  `dropdown`, `placeholder`, `optional`, `percentEncoded`, `data` for dropdowns),
+  `description` (also searched). `iconDark` is ignored. Comments may start with `#`, `//`
+  or `--`.
 - Modes: `silent` shows the last output line (or the title) in a HUD and closes the
   launcher; `compact` shows the last line in the footer; `fullOutput` shows all output
   (ANSI colors stripped) in the launcher; `inline` shows the last line as the row's
-  subtitle, refreshed every `refreshTime` (the first 10 inline scripts). A non-zero exit
-  shows the last line (or "Script failed") as an error.
+  subtitle, run on load and every `refreshTime` (the first 10 inline scripts), and in the
+  footer when run by hand. A non-zero exit shows the last line (or "Script failed") as an
+  error.
 - Arguments are passed positionally (`$1`, `$2`, `$3`). Scripts run directly when
   executable, else with their shebang interpreter; `PATH` starts with
-  `/opt/homebrew/bin:/usr/local/bin`.
-- `⌘↵` (Edit Script, `⌘E`) opens the script in its editor.
+  `/opt/homebrew/bin:/usr/local/bin`; stdout and stderr are shown together.
+- Edit Script (`⌘↵`, `⌘E`) opens the script in its default app, or your text editor when
+  that app is a terminal.
 
 ## Settings
 
-Settings live in `~/.config/soprano-cast/settings.json` (`SOPRANO_CAST_CONFIG` overrides
-the path). The file is created with comments on first launch, accepts comments and
-trailing commas, and reloads as soon as you save it. Open it with `⌘,` in the launcher, the
-menu, or Soprano Cast Settings. Every key is optional; the Action Panel edits the same
-file and keeps your comments.
+Settings live in `~/.config/soprano-cast/settings.json` (`$XDG_CONFIG_HOME/soprano-cast/`
+when `XDG_CONFIG_HOME` is set; `SOPRANO_CAST_CONFIG` overrides the whole path). The file
+is created with comments on first launch, accepts comments and trailing commas, may be a
+symlink (a dotfiles link survives), and reloads as soon as you save it. Open it with `⌘,`
+in the launcher, Settings… in the menu, or Soprano Cast Settings. Every key is optional;
+the Action Panel edits the same file and keeps your comments.
 
 A bad value is ignored and keeps its default; it never stops the app. The menu shows
-"settings.json: N warnings" with every message in its tooltip. A file that is not valid
-JSON keeps the last good settings running.
+"settings.json: N warnings" with every message in its tooltip, for example:
+
+```text
+line 12: windowManagement.halves: "cycle" is not one of "stay", "cycleSizes", "moveToDisplay"; kept "stay".
+```
+
+A file that is not valid JSON keeps the last good settings running.
 
 ```jsonc
 {
@@ -322,7 +384,7 @@ JSON keeps the last good settings running.
 
   // Global hotkeys per item id; null removes one.
   "hotkeys": {
-    "app:com.google.Chrome": "cmd+1",
+    "app:com.google.Chrome": "cmd+key:1",
     "window:leftHalf": "ctrl+opt+left",
     "system:lockScreen": "double:rcmd"
   },
@@ -367,6 +429,9 @@ JSON keeps the last good settings running.
 }
 ```
 
+The file written on first launch has empty `hotkeys`, `aliases`, `favorites`, `disabled`,
+`quicklinks` and `scriptDirectories`; the values above are examples.
+
 Item ids:
 
 | Kind | id |
@@ -380,41 +445,46 @@ Item ids:
 
 `SopranoCast list` prints every id. Notes:
 
-- An id with an unknown prefix is dropped with a warning. Ids of items that don't exist
-  right now (an app not installed yet) are kept.
-- Two hotkeys with the same shape: the later item id is dropped with a warning naming both;
-  a hotkey equal to `launcher.hotkey` is dropped.
-- An alias with other characters than a–z, 0–9 and space is dropped; duplicate aliases warn
-  but both stay.
-- Quicklinks need a unique `id` matching `[a-z0-9-]+`, a `name` and a `link`.
+- An id with an unknown prefix or nothing after the colon is dropped with a warning. Ids
+  of items that don't exist right now (an app not installed yet) are kept.
+- An invalid hotkey is dropped with a warning. Two hotkeys with the same shape (Hyper
+  expanded): the later item id is dropped with a warning naming both; a hotkey equal to
+  `launcher.hotkey` is dropped with a warning.
+- Aliases are trimmed and lowercased. An empty alias or one with other characters than
+  a–z, 0–9 and space is dropped; duplicate aliases warn but both stay.
+- An entry listed twice in `favorites`, `disabled` or `fallbacks` is dropped; a value that
+  isn't a list keeps the default.
+- Quicklinks need a unique `id` matching `[a-z0-9-]+`, a `name` and a `link`; a bad
+  `openWith` or `icon` is ignored, and unknown keys inside a quicklink warn.
 - `quickPress` other than `nothing` needs `"trigger": "capsLock"`; otherwise it warns and
   stays `nothing`.
 - Numbers out of range are clamped with a warning. Booleans must be JSON booleans and whole
   numbers whole.
-- Apps are found in /Applications, /System/Applications (both with Utilities),
-  ~/Applications, /System/Library/CoreServices/Applications, Finder's folder, and
+- Apps are found in /Applications, /System/Applications, ~/Applications,
+  /System/Library/CoreServices/Applications (with their subfolders), Finder, and
   `applicationDirectories`.
 - With `showMenuBarIcon: false`, open Soprano Cast again from Spotlight or Finder to show
-  the launcher.
+  the launcher; settings are a `⌘,` away there.
 
 ## Menu bar
 
 Open Soprano Cast (with the launcher hotkey), Settings… (`⌘,`), "settings.json: N
-warnings" while the file has problems, "N hotkeys need attention" while hotkeys failed to
-register (hover either for the messages), Permissions…, Launch at Login, About Soprano
-Cast, and Quit Soprano Cast (`⌘Q`). Hidden with `app.showMenuBarIcon: false`.
+warnings" while the file has problems, "N hotkeys need attention" while hotkeys or the
+Hyper key failed (hover either for the messages), Permissions…, Launch at Login, About
+Soprano Cast, and Quit Soprano Cast (`⌘Q`). Hidden with `app.showMenuBarIcon: false`.
 
 ## Permissions
 
 The permissions window (first launch while Accessibility is missing, and Permissions… in
 the menu) shows Accessibility with a lamp, green when granted and red when missing, and an
-Open System Settings button. It updates as soon as you grant it.
+Open System Settings button. It updates as soon as you grant it, and hotkeys that were
+waiting for it start working without a relaunch.
 
 - **Accessibility**: window management, modifier-only hotkeys (taps, double taps, both
   sides), `fn` hotkeys and the Hyper key. Ordinary combos like `⌘1` and `⌘Space` work
   without it.
-- **Automation**: Restart, Shut Down, Log Out, Empty Trash and Toggle System Appearance
-  send Apple events; macOS asks once per target app the first time.
+- **Automation**: Empty Trash (Finder) and Toggle System Appearance (System Events);
+  macOS asks once per target app the first time.
 
 ## Command line
 
@@ -423,10 +493,11 @@ The app binary doubles as a command line client for the running app:
 ```text
 Usage: SopranoCast <command>
 
-  toggle                       Show or hide the launcher
-  open <item id> [argument…]   Run an item, as its hotkey would
-  list                         List every item as JSON, sorted by title
-  help                         Show this help
+  toggle                          Open or close the launcher
+  open <item-id> [argument…]      Run an item as its hotkey would, e.g. open app:com.google.Chrome
+                                  or open cast:searchGoogle "swift testing"
+  list                            List every item as JSON, sorted by title
+  help                            Show this help
 ```
 
 ```bash
@@ -437,8 +508,16 @@ CAST="/Applications/Soprano Cast.app/Contents/MacOS/SopranoCast"
 "$CAST" list
 ```
 
-`open` runs the item without showing the launcher; an item with required arguments and none
-given opens the launcher on it. `help` / `--help` print the usage.
+- `open` runs the item without showing the launcher; arguments fill its argument fields in
+  order. An item with required arguments missing (or that asks for confirmation) opens the
+  launcher on it. Disabled items still run.
+- `list` prints a JSON array with `id`, `title`, `kind` (`application`, `systemCommand`,
+  `windowCommand`, `quicklink`, `script`, `castCommand`), `subtitle`, `hotkey` (as in
+  settings.json) and `alias` when set, `favorite` and `disabled`.
+- `help` / `--help` print the usage (exit 0). Malformed arguments print the usage on stderr
+  (exit 2). Errors print on stderr with exit 1: "Soprano Cast is not running.", "Soprano
+  Cast did not answer.", "Unknown item id <id>; ids look like app:com.google.Chrome",
+  "No item <id>".
 
 ## Development
 
@@ -450,18 +529,22 @@ swift test
 .build/debug/SopranoCast snapshot --out /tmp/cast.png
 .build/debug/SopranoCast snapshot --out /tmp/cast.png --query "chr" --keys "cmd+k" --report /tmp/cast.json
 .build/debug/SopranoCast snapshot --out /tmp/calc.png --query "2^10 / 4"
-.build/debug/SopranoCast snapshot --out /tmp/rec.png --query "chrome" --keys "shift+cmd+, return rec:cmd+1"
+.build/debug/SopranoCast snapshot --out /tmp/rec.png --query "chrome" --keys "shift+cmd+, return rec:cmd+1 wait" --report /tmp/rec.json
 ```
 
 `DEVELOPER_DIR` pins the Command Line Tools SDK, because Homebrew Swift can't read Xcode's
 newer one. `snapshot` renders the real launcher on fixture apps and scripts offscreen,
-without hotkeys or permissions; `--settings <jsonc>`, `--screen 1512x982` and
-`--theme <id>` vary the setup, and `--report` writes the query, rows, selection, overlay,
-runs and settings edits as JSON. The dev app (`com.soprano.cast.dev`) has its own
-permissions and state, and its command line only reaches the dev app. The design system
-(`Sources/SopranoCast/Vendored/`) comes from Soprano; update it with
-`scripts/sync-soprano-chrome.sh` instead of editing it here. `docs/ARCHITECTURE.md`
-describes the modules, and `docs/ROADMAP.md` lists what is not copied.
+without hotkeys or permissions. `--keys` replays key tokens (`cmd+k`, `shift+cmd+,`,
+`key:'`, `rec:<hotkey>` to record a hotkey, `wait` to let the recorder's countdown or a
+toast timer run; time stands still otherwise); `--settings <jsonc>`, `--screen 1512x982`
+and `--theme <id>` vary the setup, and `--report` writes the query, rows, selection,
+overlay, footer toast, runs and settings edits as JSON. `snapshot` without options prints
+its full usage. The dev app (`com.soprano.cast.dev`) has its own permissions and state,
+and its command line only reaches the dev app; the bare `.build/debug/SopranoCast` reaches
+the installed app. The design system (`Sources/SopranoCast/Vendored/`) and `JSONCText`
+come from Soprano; update them with `scripts/sync-soprano-chrome.sh` instead of editing
+them here. `docs/ARCHITECTURE.md` describes the modules, and `docs/ROADMAP.md` lists what
+is not copied.
 
 ## License
 

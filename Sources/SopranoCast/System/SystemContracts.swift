@@ -61,6 +61,6 @@ struct HotkeyFailure: Equatable {
 @MainActor
 protocol WindowManaging: AnyObject {
     /// Applies `command` to the frontmost app's focused window. Returns a message for the
-    /// HUD when nothing could be done ("No focused window", "Needs Accessibility").
+    /// HUD when nothing could be done ("No focused window", "Window Management needs Accessibility").
     func perform(_ command: WindowCommand, settings: WindowManagementSettings) -> String?
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Soprano Tab shares Soprano's local signing identity, signing directory and keychain, so the
+# Soprano Cast shares Soprano's local signing identity, signing directory and keychain, so the
 # whole app family is signed by one "Soprano Local Development" certificate. On a Mac that
 # already has it, this script finds and reuses it; it only creates it when neither file exists.
 

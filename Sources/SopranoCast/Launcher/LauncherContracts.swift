@@ -11,7 +11,7 @@ struct RowViewModel {
     var titleHighlights: [NSRange]
     var subtitle: String
     var icon: NSImage
-    /// Trailing type label ("Application", "Window Management", a calculator's expression).
+    /// Trailing type label ("Application", "Command", a calculator's expression).
     var accessory: String
     /// Shown as a badge after the title.
     var alias: String?

@@ -2,8 +2,6 @@ import Foundation
 
 // Messages between `SopranoCast <command>` and the running app, JSON over the
 // CFMessagePort "<bundle id>.cli" (CLIServer / CLIClient in the app target).
-// `import-raycast` does not use the port: it edits settings.json directly and the
-// running app reloads it.
 
 public enum CLIRequest: Codable, Equatable, Sendable {
     case toggleLauncher
