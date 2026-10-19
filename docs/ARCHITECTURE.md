@@ -524,6 +524,7 @@ twice). Every context but the recorder: ⌘W closeWindow, ⌘Esc popToRoot.
 @MainActor enum AppActions {
     static func open(_ item: CastItem)            // app items: activate, reopen when windowless, or launch
     static func isRunning(_ item: CastItem) -> Bool
+    static func isFrontmost(_ item: CastItem) -> Bool // frontmost app with an on-screen normal window
     static func quit(_ item: CastItem)
     static func hide(_ item: CastItem)
     static func bundleURL(for item: CastItem) -> URL?
@@ -716,6 +717,9 @@ script catalog after building the controller (the controller never starts its so
     /// on it (only that row, under "results", until the query changes) with the first
     /// missing argument focused; one that needs confirmation opens pinned on its confirmation.
     func run(itemID: ItemID, arguments: [String])
+    /// An item's hotkey: an application item whose app `runner.isFrontmost` hides it
+    /// (`perform(.hideApplication)`, launcher closes); everything else `run(itemID:arguments: [])`.
+    func runHotkey(itemID: ItemID)
     func settingsDidChange()
     /// For the harness and tests: the current state.
     var state: LauncherStateSnapshot { get }
@@ -784,9 +788,12 @@ Controller behavior:
   (values kept per item while the selection doesn't change); Tab/⇧Tab cycle focus query →
   args → query; typing an alias + space, when that alias belongs to a listed non-fallback
   row with arguments, selects it and focuses its first argument (the space isn't typed).
-- `run(itemID:)` (hotkeys): runs without showing; HUDs show on the launcher's display while
-  it is visible, else `environment.screenFrame(settings.launcher.screen)`. The `.launcher`
-  target is the app delegate's (`toggle()`).
+- `run(itemID:)` (hotkeys, CLI): runs without showing; HUDs show on the launcher's display while
+  it is visible, else `environment.screenFrame(settings.launcher.screen)`. Hotkeys go through
+  `runHotkey(itemID:)`, which toggles apps like Raycast: pressing an app's hotkey while that
+  app is in front with a window on screen hides it; a frontmost app without windows (Finder
+  on the desktop) is opened (reopen event) instead. The `.launcher` target is the app
+  delegate's (`toggle()`).
 - Shows on `environment.screenFrame(settings.launcher.screen)`; `onResignKey` hides when
   `closeOnFocusLoss`. Mouse: a click selects a row, a double click runs it, clicking an
   action runs it.
@@ -815,8 +822,8 @@ Controller behavior:
   `HyperKeyController`, `LauncherWindow`, `LauncherController` with an environment over
   `SettingsCenter`, `ThemeCenter`, `AppStateStore` (UserDefaults) and
   `DispatchQueue.main.asyncAfter`; then starts the app and script catalogs.
-  `hotkeys.onTrigger` → `.launcher` → `toggle()`, `.item(id)` → `run(itemID:arguments:
-  [])`. At start (forced) and on settings changes: the Hyper key is re-applied when
+  `hotkeys.onTrigger` → `.launcher` → `toggle()`, `.item(id)` → `runHotkey(itemID:)`.
+  At start (forced) and on settings changes: the Hyper key is re-applied when
   `hyperKey` changed, and `hotkeys.setBindings(settings.hotkeyBindings, hyperKey:)` runs
   when the bindings or the Hyper key changed; failures are logged and shown in the menu.
   While a hotkey or the Hyper key failed and Accessibility is missing, a 1 s poll re-applies

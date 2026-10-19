@@ -572,6 +572,27 @@ struct LauncherControllerTests {
         #expect(!harness.controller.isVisible)
     }
 
+    @Test("an app's hotkey hides the app when it is already in front and closes the launcher")
+    func hotkeyHidesFrontmostApp() {
+        let harness = LauncherHarness()
+        harness.runner.frontmostIDs = [chrome.id]
+        harness.runner.actionOutcome = .done(closeLauncher: true)
+        harness.controller.show()
+        harness.controller.runHotkey(itemID: chrome.id)
+        #expect(harness.runner.actions == [StubRunner.Action(action: .hideApplication, id: chrome.id)])
+        #expect(harness.runner.runs.isEmpty)
+        #expect(!harness.controller.isVisible)
+    }
+
+    @Test("an app's hotkey opens the app when another app is in front")
+    func hotkeyOpensBackgroundApp() {
+        let harness = LauncherHarness()
+        harness.runner.frontmostIDs = [slack.id]
+        harness.controller.runHotkey(itemID: chrome.id)
+        #expect(harness.runner.runs == [StubRunner.Run(id: chrome.id, arguments: [])])
+        #expect(harness.runner.actions.isEmpty)
+    }
+
     @Test("allItems lists the sources' items and the built-in commands")
     func allItems() {
         let harness = LauncherHarness()

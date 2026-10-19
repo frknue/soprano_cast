@@ -209,6 +209,10 @@ German), modifiers in the order `⌃⌥⇧⌘`: `⇧⌘K`.
   by itself). A tap fires when exactly its modifiers go down and up within 0.5 s with no
   other key; a double tap needs the second press within 0.35 s of the first release.
 
+**Apps toggle.** An app's hotkey brings the app to the front; pressed again while that app
+is in front with a window on screen, it hides the app, as in Raycast. A frontmost app
+without windows (Finder on the desktop) gets a new window instead.
+
 **Recording.** Set Hotkey… (in `⌘K` or `⇧⌘,`) opens the recorder, showing the current
 hotkey or "recording…". Press the combo, tap the modifier(s), tap one twice, or hold both
 sides; the keycaps show what was recorded, and it saves after 1.5 s. `↵` saves now, `⌫`

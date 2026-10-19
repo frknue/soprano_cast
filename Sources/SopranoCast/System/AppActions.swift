@@ -52,6 +52,15 @@ enum AppActions {
         !runningApplications(for: item).isEmpty
     }
 
+    /// Whether the app is the frontmost one and shows a window on screen. A frontmost app
+    /// without windows (Finder on the desktop) doesn't count: its hotkey opens a window.
+    static func isFrontmost(_ item: CastItem) -> Bool {
+        guard let front = NSWorkspace.shared.frontmostApplication else { return false }
+        let pid = front.processIdentifier
+        return runningApplications(for: item).contains { $0.processIdentifier == pid }
+            && hasOnScreenWindows(pid: pid)
+    }
+
     static func quit(_ item: CastItem) {
         for app in runningApplications(for: item) {
             app.terminate()

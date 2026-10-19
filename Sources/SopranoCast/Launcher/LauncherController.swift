@@ -172,6 +172,16 @@ final class LauncherController {
         }
     }
 
+    /// An item's hotkey: `run(itemID:arguments: [])`, except that an application already in
+    /// front with a window on screen is hidden instead, as in Raycast.
+    func runHotkey(itemID: ItemID) {
+        if let item = itemsByID[itemID], item.kind == .application, runner.isFrontmost(item) {
+            present(runner.perform(.hideApplication, on: item))
+            return
+        }
+        run(itemID: itemID, arguments: [])
+    }
+
     /// Settings or the theme changed: reloads settings, rebuilds the items and the ranking
     /// (keeping the selection) and redraws.
     func settingsDidChange() {

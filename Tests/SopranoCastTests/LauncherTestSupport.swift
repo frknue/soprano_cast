@@ -91,6 +91,7 @@ final class StubRunner: ItemRunning {
     var outcomes: [ItemID: RunOutcome] = [:]
     var actionOutcome: RunOutcome = .hud("Copied")
     var runningIDs: Set<ItemID> = []
+    var frontmostIDs: Set<ItemID> = []
 
     func run(_ item: CastItem, arguments: [String], completion: @escaping @MainActor (RunOutcome) -> Void) {
         runs.append(Run(id: item.id, arguments: arguments))
@@ -104,6 +105,10 @@ final class StubRunner: ItemRunning {
 
     func isRunning(_ item: CastItem) -> Bool {
         runningIDs.contains(item.id)
+    }
+
+    func isFrontmost(_ item: CastItem) -> Bool {
+        frontmostIDs.contains(item.id)
     }
 }
 

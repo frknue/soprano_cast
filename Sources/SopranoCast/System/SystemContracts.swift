@@ -36,6 +36,9 @@ protocol ItemRunning: AnyObject {
     func perform(_ action: ItemActionID, on item: CastItem) -> RunOutcome
     /// Whether an application item's app is running (the Action Panel offers Quit/Hide then).
     func isRunning(_ item: CastItem) -> Bool
+    /// Whether an application item's app is in front with a window on screen (its hotkey
+    /// hides it then).
+    func isFrontmost(_ item: CastItem) -> Bool
 }
 
 /// Global hotkeys.

@@ -25,6 +25,11 @@ final class FixtureRunner: ItemRunning {
         item.kind == .application && FixtureCatalog.runningBundleIDs.contains(item.id.key)
     }
 
+    /// No fixture app is in front: the launcher's panel never activates Soprano Cast.
+    func isFrontmost(_ item: CastItem) -> Bool {
+        false
+    }
+
     /// Scripts end like `ScriptRunner` presents a successful run of their mode; everything
     /// else is done and closes the launcher.
     private static func outcome(for item: CastItem) -> RunOutcome {

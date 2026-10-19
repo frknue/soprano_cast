@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeys.onTrigger = { [weak controller] target in
             switch target {
             case .launcher: controller?.toggle()
-            case .item(let id): controller?.run(itemID: id, arguments: [])
+            case .item(let id): controller?.runHotkey(itemID: id)
             }
         }
         applyHotkeys(force: true)

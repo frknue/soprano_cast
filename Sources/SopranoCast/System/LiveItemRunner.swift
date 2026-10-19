@@ -94,6 +94,10 @@ final class LiveItemRunner: ItemRunning {
         item.kind == .application && AppActions.isRunning(item)
     }
 
+    func isFrontmost(_ item: CastItem) -> Bool {
+        item.kind == .application && AppActions.isFrontmost(item)
+    }
+
     // MARK: - Running
 
     /// Every kind but scripts, which finish asynchronously.
