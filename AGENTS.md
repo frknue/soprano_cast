@@ -5,7 +5,8 @@ hotkeys (global hotkeys of every Raycast type on any command, aliases, favorites
 Panel, window management, system commands, quicklinks, Raycast-format script commands, an
 inline calculator) in Soprano's "Mission Control" chrome. Swift 6 + programmatic AppKit (no
 storyboards/xibs/SwiftUI), SPM, macOS 14+, menu-bar app (no Dock icon). Shipped as a
-hand-packaged `.app` via `scripts/install.sh`. Local only: there is no GitHub remote yet.
+hand-packaged `.app` via `scripts/install.sh`. GitHub:
+[`frknue/soprano_cast`](https://github.com/frknue/soprano_cast) (public).
 
 ## Commands
 
@@ -68,7 +69,7 @@ Never use `sudo`; report permission problems instead. Docs-only work needs no in
 
 ## Commits and changelog
 
-- No remote exists yet. Create one, push, open PRs or create tags only when the user asks.
+- Push, open PRs, or create tags only when the user asks for that remote action.
 - Short imperative subjects, `feat:` / `fix:` / `docs:` / `test:` / `chore:` prefixes.
 - User-visible changes get a line under `## [Unreleased]` in `CHANGELOG.md` (Keep a
   Changelog groups: Added, Changed, Deprecated, Removed, Fixed, Security), written for the
