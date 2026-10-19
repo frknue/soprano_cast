@@ -24,10 +24,6 @@ struct LauncherStateSnapshot: Equatable {
 final class LauncherController {
     /// How long a footer toast stays.
     static let toastMilliseconds = 3000
-    /// A recorded hotkey saves itself after this long.
-    static let recorderCountdownMilliseconds = 1500
-    /// The countdown bar advances this often.
-    static let recorderTickMilliseconds = 100
 
     /// The key code `key` sits on: physical keys their own, named keys their canonical code,
     /// character keys the one typing that character on the current layout (main thread).
@@ -51,8 +47,12 @@ final class LauncherController {
 
     /// Reloaded from `environment.settings()` by `settingsDidChange`.
     private var settings: CastSettings
-    /// Every item Root Search can list right now (sources + `BuiltinItems`), for the CLI.
+    /// Every item Root Search can list right now (sources + `BuiltinItems`), for the CLI
+    /// and the settings window.
     private(set) var allItems: [CastItem] = []
+    /// Called after a source changed `allItems` (apps installed, scripts edited). Settings
+    /// changes rebuild them too, inside `settingsDidChange()`.
+    var onItemsChange: (() -> Void)?
     private var itemsByID: [ItemID: CastItem] = [:]
     private var usage: [ItemID: UsageRecord]
     private var history: SearchHistory
@@ -325,7 +325,7 @@ final class LauncherController {
             overlay = .actionPanel(panel)
         case .aliasEditor(var editor):
             editor.text = text.lowercased()
-            editor.error = Self.isValidAlias(editor.text) ? nil : Self.aliasCharactersError
+            editor.error = AliasText.isValid(editor.text) ? nil : AliasText.charactersError
             overlay = .aliasEditor(editor)
         case .none, .recorder, .output, .confirmation:
             return
@@ -703,26 +703,17 @@ final class LauncherController {
 
     private func toggleFavorite(_ item: CastItem) {
         guard item.kind != .calculator else { return }
-        var favorites = settings.favorites
-        if let index = favorites.firstIndex(of: item.id) {
-            favorites.remove(at: index)
-        } else {
-            favorites.append(item.id)
-        }
-        applyEdits([.set(favorites.map(\.rawValue), ["favorites"])])
+        applyEdits([.set(settings.favoriteIDs(toggling: item.id), ["favorites"])])
     }
 
     private func moveFavorite(_ item: CastItem, by offset: Int) {
-        var favorites = settings.favorites
-        guard let index = favorites.firstIndex(of: item.id), favorites.indices.contains(index + offset) else { return }
-        favorites.swapAt(index, index + offset)
-        applyEdits([.set(favorites.map(\.rawValue), ["favorites"])])
+        guard let favorites = settings.favoriteIDs(moving: item.id, by: offset) else { return }
+        applyEdits([.set(favorites, ["favorites"])])
     }
 
     private func disable(_ item: CastItem) {
         guard item.kind != .calculator, !settings.disabled.contains(item.id) else { return }
-        let disabled = (settings.disabled.map(\.rawValue) + [item.id.rawValue]).sorted()
-        if applyEdits([.set(disabled, ["disabled"])]) {
+        if applyEdits([.set(settings.disabledIDs(setting: item.id, enabled: false), ["disabled"])]) {
             showToast("Disabled \(item.title)", isError: false)
         }
     }
@@ -750,98 +741,84 @@ final class LauncherController {
     /// Opens the recorder on the item's current hotkey and suspends every global hotkey,
     /// so the recorder receives combos like ⌘1 itself.
     private func openRecorder(for item: CastItem) {
-        let current = settings.hotkeys[item.id]
-        setOverlay(.recorder(Recorder(item: item, keys: current.map { .spec($0) } ?? .display([]))))
+        let session = HotkeyRecordingSession(target: .item(item.id), current: settings.hotkeys[item.id])
+        setOverlay(.recorder(Recorder(item: item, session: session)))
         hotkeys.suspend()
     }
 
     private func recorderDidReceive(_ event: KeyEvent) {
-        guard case .recorder(var session) = overlay else { return }
-        let update = session.recorder.handle(event)
-        switch update {
-        case .pending(let display):
-            // A new hold: what was recorded is being replaced.
+        guard case .recorder(var recorder) = overlay else { return }
+        let target = recorder.session.target
+        let step = recorder.session.handle(event) { [self] spec in owner(of: spec, except: target) }
+        overlay = .recorder(recorder)
+        perform(step, for: recorder)
+        render()
+    }
+
+    /// The countdown ran out: saves what was recorded.
+    private func commitRecorder() {
+        guard case .recorder(let recorder) = overlay else { return }
+        perform(recorder.session.commit { [self] spec in owner(of: spec, except: recorder.session.target) }, for: recorder)
+        render()
+    }
+
+    private func perform(_ step: HotkeyRecordingSession.Step, for recorder: Recorder) {
+        switch step {
+        case .none:
+            break
+        case .redraw:
             stopCountdown()
-            session.keys = .display(display)
-            session.spec = nil
-            session.owner = nil
-            session.countdown = nil
-            overlay = .recorder(session)
-        case .recorded(let spec):
-            session.spec = spec
-            session.keys = .spec(spec)
-            session.owner = owner(of: spec, for: session.item)
-            session.countdown = nil
-            overlay = .recorder(session)
-            if session.owner == .launcher {
-                stopCountdown()
-            } else {
-                startCountdown()
+            updateRecorder { $0.countdown = nil }
+        case .startCountdown:
+            startCountdown()
+        case .save(let spec, let takingFrom):
+            setOverlay(.none)
+            var edits: [SettingsEdit] = []
+            if case .item(let other) = takingFrom {
+                edits.append(.remove(["hotkeys", other.rawValue]))
             }
-        case .cleared:
-            let hasHotkey = settings.hotkeys[session.item.id] != nil
+            edits.append(.set(spec.settingsText, ["hotkeys", recorder.item.id.rawValue]))
+            applyEdits(edits)
+        case .clear:
+            let hasHotkey = settings.hotkeys[recorder.item.id] != nil
             setOverlay(.none)
             if hasHotkey {
-                applyEdits([.remove(["hotkeys", session.item.id.rawValue])])
+                applyEdits([.remove(["hotkeys", recorder.item.id.rawValue])])
             }
-        case .cancelled:
+        case .close:
             setOverlay(.none)
-        case .commit:
-            overlay = .recorder(session)
-            if session.spec == nil {
-                setOverlay(.none)
-            } else {
-                saveRecordedHotkey()
-            }
-        case .unchanged:
-            overlay = .recorder(session)
         }
-        render()
     }
 
     /// The target already using `spec`, comparing keys by position: a character hotkey
     /// (`shift+cmd+k`) and a physical one (`shift+cmd+key:k`) on the same key conflict.
-    private func owner(of spec: HotkeySpec, for item: CastItem) -> HotkeyTarget? {
+    private func owner(of spec: HotkeySpec, except target: HotkeyTarget) -> HotkeyTarget? {
         HotkeyConflicts.owner(
             of: spec,
             in: settings.hotkeyBindings,
-            except: .item(item.id),
+            except: target,
             hyperIncludesShift: settings.hyperKey.includeShift,
             keyCode: keyCode
         )
     }
 
-    /// Saves the recorded hotkey, first removing it from the item that holds it. The
-    /// launcher's own hotkey can't be taken.
-    private func saveRecordedHotkey() {
-        guard case .recorder(let session) = overlay, let spec = session.spec else { return }
-        let owner = owner(of: spec, for: session.item)
-        guard owner != .launcher else { return }
-        setOverlay(.none)
-        var edits: [SettingsEdit] = []
-        if case .item(let other) = owner {
-            edits.append(.remove(["hotkeys", other.rawValue]))
-        }
-        edits.append(.set(spec.settingsText, ["hotkeys", session.item.id.rawValue]))
-        applyEdits(edits)
-        render()
-    }
-
     private func startCountdown() {
         stopCountdown()
         updateRecorder { $0.countdown = 0 }
-        cancelCountdown = environment.schedule(Self.recorderCountdownMilliseconds) { [weak self] in
-            self?.saveRecordedHotkey()
+        cancelCountdown = environment.schedule(HotkeyRecordingSession.countdownMilliseconds) { [weak self] in
+            self?.commitRecorder()
         }
         scheduleCountdownTick(elapsed: 0)
     }
 
     private func scheduleCountdownTick(elapsed: Int) {
-        cancelCountdownTick = environment.schedule(Self.recorderTickMilliseconds) { [weak self] in
+        let total = HotkeyRecordingSession.countdownMilliseconds
+        let tick = HotkeyRecordingSession.tickMilliseconds
+        cancelCountdownTick = environment.schedule(tick) { [weak self] in
             guard let self else { return }
-            let now = elapsed + Self.recorderTickMilliseconds
-            guard now < Self.recorderCountdownMilliseconds else { return }
-            updateRecorder { $0.countdown = Double(now) / Double(Self.recorderCountdownMilliseconds) }
+            let now = elapsed + tick
+            guard now < total else { return }
+            updateRecorder { $0.countdown = Double(now) / Double(total) }
             render()
             scheduleCountdownTick(elapsed: now)
         }
@@ -855,20 +832,12 @@ final class LauncherController {
     }
 
     private func updateRecorder(_ change: (inout Recorder) -> Void) {
-        guard case .recorder(var session) = overlay else { return }
-        change(&session)
-        overlay = .recorder(session)
+        guard case .recorder(var recorder) = overlay else { return }
+        change(&recorder)
+        overlay = .recorder(recorder)
     }
 
     // MARK: - Alias editor
-
-    static let aliasCharactersError = "Use only a–z, 0–9 and spaces"
-
-    static func isValidAlias(_ text: String) -> Bool {
-        text.allSatisfy { character in
-            character == " " || (character.isASCII && (character.isLowercase || character.isNumber))
-        }
-    }
 
     /// ↵ in the alias editor: saves the trimmed alias, or removes it when empty.
     private func saveAlias() {
@@ -947,6 +916,7 @@ final class LauncherController {
         validateOverlay()
         rank(resetSelection: false)
         render()
+        onItemsChange?()
     }
 
     /// Sources first, then `BuiltinItems`; the first item wins when an id repeats.
@@ -1092,12 +1062,12 @@ final class LauncherController {
                 rows: LauncherModelBuilder.actionRows(filteredActions(panel)),
                 selectedIndex: panel.selectedIndex
             )
-        case .recorder(let session):
+        case .recorder(let recorder):
             return LauncherModelBuilder.recorder(
-                itemTitle: session.item.title,
-                keys: session.keys,
-                conflict: LauncherModelBuilder.conflictText(ownerTitle: session.owner.map { title(of: $0) }),
-                countdown: session.countdown
+                itemTitle: recorder.item.title,
+                keys: recorder.session.keys,
+                conflict: LauncherModelBuilder.conflictText(ownerTitle: recorder.session.owner.map { title(of: $0) }),
+                countdown: recorder.countdown
             )
         case .aliasEditor(let editor):
             return .aliasEditor(itemTitle: editor.item.title, text: editor.text, error: editor.error)
@@ -1129,18 +1099,9 @@ private struct ActionPanel {
 
 private struct Recorder {
     var item: CastItem
-    var recorder = HotkeyRecorder()
-    /// Keycaps shown: the current hotkey, what is held, or what was recorded.
-    var keys: LauncherModelBuilder.RecorderKeys
-    var spec: HotkeySpec?
-    var owner: HotkeyTarget?
+    var session: HotkeyRecordingSession
     /// 0…1 while the auto-save counts down.
     var countdown: Double?
-
-    init(item: CastItem, keys: LauncherModelBuilder.RecorderKeys) {
-        self.item = item
-        self.keys = keys
-    }
 }
 
 private struct AliasEditor {

@@ -122,11 +122,14 @@ protocol LauncherPresenting: AnyObject {
     func renderSnapshot(screenFrame: CGRect, scale: CGFloat, backdrop: CGImage?) -> CGImage?
 }
 
-/// A settings.json change the launcher makes (favorites, hotkeys, aliases, disabled).
+/// A settings.json change the launcher or the settings window makes.
 enum SettingsEdit {
-    /// Sets a JSON value (Bool, Int, String, [Any], [String: Any]) at a key path.
+    /// Sets a JSON value (Bool, Int, String, [Any], [String: Any], NSNull) at a key path.
     case set(Any, [String])
     case remove([String])
+    /// Writes the "quicklinks" entry with this id (appending it when new), or removes it
+    /// with nil fields; every other entry stays as written.
+    case quicklink(id: String, fields: QuicklinkFields?)
 }
 
 /// What `LauncherController` needs from the app; injectable for tests and the harness.

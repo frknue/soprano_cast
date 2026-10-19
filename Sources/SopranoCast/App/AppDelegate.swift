@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var cliServer: CLIServer?
     private var permissionsWindow: PermissionsWindowController?
+    private var settingsWindow: SettingsWindowController?
     private var accessibilityPoll: Timer?
 
     private var appliedStartAtLogin: Bool?
@@ -74,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.hotkeys = hotkeys
         self.hyperKey = hyperKey
         self.controller = controller
+        controller.onItemsChange = { [weak self] in
+            self?.settingsWindow?.itemsDidChange()
+        }
 
         // The controller listens to its sources from init on, so start them only now.
         appCatalog.start()
@@ -97,6 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             openPermissions: { [weak self] in
                 self?.showPermissions()
+            },
+            openSettings: { [weak self] in
+                self?.showSettings()
             }
         )
         applyLoginItem()
@@ -110,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         ThemeCenter.shared.addObserver(self) { [weak self] in
             self?.controller?.settingsDidChange()
+            self?.settingsWindow?.themeDidChange()
         }
 
         onboardIfNeeded()
@@ -139,22 +147,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             editSettings: { try SettingsCenter.shared.edit($0) },
             theme: { ThemeCenter.shared.theme },
             now: { Date() },
-            schedule: { milliseconds, work in
-                let scheduled = ScheduledWork(work)
-                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
-                    MainActor.assumeIsolated {
-                        scheduled.run()
-                    }
-                }
-                // Controllers cancel on the main thread.
-                return { MainActor.assumeIsolated { scheduled.cancel() } }
-            },
+            schedule: Self.schedule,
             screenFrame: { Self.visibleFrame(for: $0) },
             loadUsage: { store.loadUsage() },
             saveUsage: { store.saveUsage($0) },
             loadHistory: { store.loadHistory() },
             saveHistory: { store.saveHistory($0) }
         )
+    }
+
+    /// Runs `work` on the main actor after `milliseconds`; the returned closure cancels it.
+    private static func schedule(_ milliseconds: Int, _ work: @escaping @MainActor () -> Void) -> (() -> Void) {
+        let scheduled = ScheduledWork(work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(milliseconds)) {
+            MainActor.assumeIsolated {
+                scheduled.run()
+            }
+        }
+        // Controllers cancel on the main thread.
+        return { MainActor.assumeIsolated { scheduled.cancel() } }
     }
 
     /// The AppKit visible frame of the display `choice` picks: the one under the mouse, the
@@ -219,7 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func perform(_ command: CastCommand) -> RunOutcome {
         switch command {
         case .openSettings:
-            SettingsCenter.shared.openInEditor()
+            showSettings()
             return .done(closeLauncher: true)
         case .reloadScripts:
             scripts?.reload()
@@ -242,6 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller?.settingsDidChange()
         applyHotkeys(force: false)
         menuBar?.apply()
+        settingsWindow?.settingsDidChange()
         applyLoginItem()
     }
 
@@ -321,6 +333,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         permissionsWindow = window
         NSApp.activate()
         window.showWindow(nil)
+    }
+
+    // MARK: - Settings window
+
+    /// Opens the settings window, created on first use.
+    private func showSettings() {
+        guard let hotkeys, let controller else { return }
+        let window = settingsWindow ?? makeSettingsWindow(hotkeys: hotkeys, controller: controller)
+        settingsWindow = window
+        window.present()
+    }
+
+    private func makeSettingsWindow(hotkeys: HotkeyCenter, controller: LauncherController) -> SettingsWindowController {
+        let center = SettingsCenter.shared
+        let environment = SettingsWindowEnvironment(
+            settings: { center.settings },
+            issues: { center.issues },
+            settingsPath: center.displayPath,
+            editSettings: { try center.edit($0) },
+            items: { [weak controller] in controller?.allItems ?? [] },
+            theme: { ThemeCenter.shared.theme },
+            schedule: Self.schedule,
+            openSettingsFile: { center.openInEditor() },
+            revealSettingsFile: { NSWorkspace.shared.activateFileViewerSelecting([center.fileURL]) },
+            chooseFolder: { [weak self] completion in self?.chooseFolder(completion) }
+        )
+        // Its own icon provider: the launcher's `onLoad` belongs to the launcher.
+        return SettingsWindowController(
+            environment: environment,
+            icons: LiveIconProvider(theme: { ThemeCenter.shared.theme }),
+            hotkeys: hotkeys,
+            keyCode: LauncherController.layoutKeyCode
+        )
+    }
+
+    /// A folder picker, as a sheet on the settings window; paths in the home folder use "~".
+    private func chooseFolder(_ completion: @escaping @MainActor (String) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Add Folder"
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK, let url = panel.url else { return }
+            MainActor.assumeIsolated {
+                completion((url.path as NSString).abbreviatingWithTildeInPath)
+            }
+        }
+        if let window = settingsWindow?.window {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            panel.begin(completionHandler: finish)
+        }
     }
 }
 

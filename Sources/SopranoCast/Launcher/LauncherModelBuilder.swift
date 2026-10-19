@@ -174,17 +174,9 @@ enum LauncherModelBuilder {
         }
     }
 
-    /// What the recorder card shows as keycaps.
-    enum RecorderKeys: Equatable {
-        /// A hotkey (the current one, or what was just recorded), drawn with `keycaps`.
-        case spec(HotkeySpec)
-        /// The recorder's own display strings while modifiers are held.
-        case display([String])
-    }
-
     static func recorder(
         itemTitle: String,
-        keys: RecorderKeys,
+        keys: HotkeyRecordingSession.Keys,
         conflict: String?,
         countdown: Double?,
         keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)

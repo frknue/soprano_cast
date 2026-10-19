@@ -75,15 +75,17 @@ final class SettingsCenter {
         }
     }
 
-    /// Applies one launcher or menu edit to settings.json, keeping its comments and key
-    /// order, then reloads (observers fire when anything changed). A missing file starts
-    /// from the template.
+    /// Applies one launcher, menu or settings-window edit to settings.json, keeping its
+    /// comments and key order, then reloads (observers fire when anything changed). A
+    /// missing file starts from the template.
     func edit(_ edit: SettingsEdit) throws {
         let text = (try? SettingsFile.read(at: fileURL)) ?? SettingsTemplate.text
         let edited: String
         switch edit {
         case .set(let value, let path): edited = try SettingsEditor.setting(value, at: path, in: text)
         case .remove(let path): edited = try SettingsEditor.removing(at: path, in: text)
+        case .quicklink(let id, let fields?): edited = try SettingsEditor.settingQuicklink(fields, id: id, in: text)
+        case .quicklink(let id, nil): edited = try SettingsEditor.removingQuicklink(id: id, in: text)
         }
         try SettingsFile.write(edited, to: fileURL)
         reload()

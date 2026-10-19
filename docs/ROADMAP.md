@@ -5,8 +5,6 @@ below, followed by what is not built yet.
 
 ## Not copied (family conventions)
 
-- The Settings window: `~/.config/soprano-cast/settings.json`, live reloaded; hotkeys and
-  aliases are also set from the Action Panel.
 - Cloud Sync.
 - The Raycast account.
 - AI.

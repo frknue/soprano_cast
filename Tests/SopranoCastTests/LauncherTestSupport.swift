@@ -399,6 +399,9 @@ final class LauncherHarness {
                 throw EditError()
             }
             log.append("remove \(path.joined(separator: "."))")
+        case .quicklink:
+            // The launcher never writes quicklinks.
+            throw EditError()
         }
     }
 }

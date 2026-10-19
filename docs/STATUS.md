@@ -35,6 +35,17 @@ not copied.
   `~/.config/soprano-cast/settings.json`: the user's 11 app hotkeys (by key position,
   `key:`), `windowManagement.halves: cycleSizes` and `app.showMenuBarIcon: false`; Raycast's
   other settings already equal the defaults.
+- Settings window (branch `feat/settings-window`): Raycast's Settings layout in Soprano's
+  settings chrome — General (settings.json card with warnings, login, launcher hotkey,
+  menu bar icon, theme, ordered favorites and fallbacks), Extensions (grouped command
+  table with alias, hotkey and Enabled per row, filter, detail pane for favorites,
+  fallbacks, quicklinks, script and app folders, window management) and Advanced (screen,
+  pop to root, navigation, focus loss, Hyper key). `⌘,`, Settings… and the Settings
+  command open it; the file stays the source of truth (live both ways). The launcher's
+  recorder logic moved into Core (`HotkeyRecordingSession`) and is shared with the window;
+  quicklink edits keep every other entry of the raw array. 416 tests pass; every tab,
+  group pane, the recorder (with a conflict) and a realistic settings file checked in the
+  `--settings-window` snapshots.
 
 ## Next
 

@@ -4,6 +4,11 @@ import Foundation
 /// and becomes a `.warning` naming its dotted path ("launcher.screen", "quicklinks[2].id",
 /// "hotkeys.app:com.google.Chrome"), the value found and what is allowed.
 public enum SettingsResolver {
+    /// Characters an alias may contain (after lowercasing).
+    public static let aliasCharacters = Set("abcdefghijklmnopqrstuvwxyz0123456789 ")
+    /// Characters a quicklink id may contain.
+    public static let quicklinkIDCharacters = Set("abcdefghijklmnopqrstuvwxyz0123456789-")
+
     /// JSONC (comments, trailing commas) → settings over the defaults. A document that is
     /// not a JSON object gives `settings == nil` and one `.error` issue with its line.
     /// Every bad value is a `.warning` and keeps its default; unknown keys warn.
@@ -64,10 +69,6 @@ private struct Reader {
         "windowManagement", "app",
     ]
     static let quicklinkKeys: Set<String> = ["id", "name", "link", "openWith", "icon"]
-    /// Characters an alias may contain (after lowercasing).
-    static let aliasCharacters = Set("abcdefghijklmnopqrstuvwxyz0123456789 ")
-    /// Characters a quicklink id may contain.
-    static let quicklinkIDCharacters = Set("abcdefghijklmnopqrstuvwxyz0123456789-")
 
     mutating func settings(from root: [String: Any]) -> CastSettings {
         var settings = CastSettings()
@@ -226,7 +227,7 @@ private struct Reader {
                 warn("\(path): \(describe(value)) is empty; dropped.")
                 continue
             }
-            guard alias.allSatisfy({ Self.aliasCharacters.contains($0) }) else {
+            guard alias.allSatisfy({ SettingsResolver.aliasCharacters.contains($0) }) else {
                 warn("\(path): \(describe(value)) may only contain a–z, 0–9 and spaces; dropped.")
                 continue
             }
@@ -298,7 +299,7 @@ private struct Reader {
             }
             warnUnknownKeys(in: object, path: path, known: Self.quicklinkKeys)
 
-            guard let id = object["id"] as? String, !id.isEmpty, id.allSatisfy({ Self.quicklinkIDCharacters.contains($0) }) else {
+            guard let id = object["id"] as? String, !id.isEmpty, id.allSatisfy({ SettingsResolver.quicklinkIDCharacters.contains($0) }) else {
                 let found = object["id"].map { describe($0) } ?? "missing"
                 warn("\(path).id: \(found) is not an id of a–z, 0–9 and \"-\"; quicklink dropped.")
                 continue

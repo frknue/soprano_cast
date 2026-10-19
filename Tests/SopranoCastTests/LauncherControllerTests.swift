@@ -328,7 +328,7 @@ struct LauncherControllerTests {
         #expect(countdown == 0)
         #expect(harness.edits.isEmpty)
 
-        harness.scheduler.fire(milliseconds: LauncherController.recorderTickMilliseconds)
+        harness.scheduler.fire(milliseconds: HotkeyRecordingSession.tickMilliseconds)
         guard case .recorder(_, _, _, let progress?, _)? = harness.overlayModel else {
             Issue.record("no countdown")
             return

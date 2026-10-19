@@ -126,6 +126,34 @@ struct SnapshotCommandTests {
         #expect(result.report.runs.isEmpty && result.report.edits.isEmpty)
     }
 
+    @Test("the settings-window options parse; each mode rejects the other's options")
+    func settingsWindowOptions() throws {
+        let options = try parse([
+            "--settings-window", "extensions", "--select", "group:quicklinks", "--filter", "git", "--record", "launcher",
+        ])
+        #expect(options.settingsWindow == .extensions)
+        #expect(options.select == "group:quicklinks")
+        #expect(options.filter == "git")
+        #expect(options.record == "launcher")
+        #expect(throws: Command.OptionError.badSettingsTab("misc")) { try parse(["--settings-window", "misc"]) }
+        #expect(throws: Command.OptionError.needsSettingsWindow("--select")) { try parse(["--select", "group:system"]) }
+        #expect(throws: Command.OptionError.launcherOnly("--query")) { try parse(["--settings-window", "general", "--query", "x"]) }
+        #expect(throws: Command.OptionError.launcherOnly("--screen")) { try parse(["--settings-window", "general", "--screen", "1920x1200"]) }
+    }
+
+    @Test("the settings window renders at 2x; a filter lists only matching rows; a recording saves after wait")
+    func renderSettingsWindow() throws {
+        let result = try Command.render(try parse(["--settings-window", "extensions", "--filter", "left half"]))
+        #expect(result.image.width == Int(SettingsWindowController.contentSize.width) * 2)
+        #expect(result.report.rows == ["group:windowManagement", "window:leftHalf"])
+        #expect(result.report.query == "left half")
+
+        let recorded = try render(["--settings-window", "extensions", "--record", "app:com.apple.mail", "--keys", "rec:cmd+2 wait"])
+        #expect(recorded.overlay == "none")
+        #expect(recorded.edits == ["set hotkeys.app:com.apple.mail = \"cmd+key:2\""])
+        #expect(throws: FixtureError.self) { try render(["--settings-window", "extensions", "--select", "app:com.example.none"]) }
+    }
+
     @Test("a query ranks and selects Google Chrome first")
     func renderQuery() throws {
         let report = try render(["--query", "chrome"])

@@ -68,6 +68,14 @@ enum SnapshotCommand {
         var screenSize = SnapshotCommand.defaultScreenSize
         var theme: String?
         var report: URL?
+        /// Renders the settings window on this tab instead of the launcher.
+        var settingsWindow: SettingsTab?
+        /// Extensions: "group:<group>" or an item id to select.
+        var select: String?
+        /// Extensions: the table's search text.
+        var filter: String?
+        /// "launcher" or an item id whose hotkey the recorder card records (`--keys` go to it).
+        var record: String?
     }
 
     enum OptionError: Error, Equatable, CustomStringConvertible {
@@ -78,6 +86,11 @@ enum SnapshotCommand {
         case unknownKeyToken(String)
         case badRecording(String)
         case badWait(String)
+        case badSettingsTab(String)
+        /// A settings-window option without `--settings-window`.
+        case needsSettingsWindow(String)
+        /// A launcher option with `--settings-window`.
+        case launcherOnly(String)
 
         var description: String {
             switch self {
@@ -90,6 +103,10 @@ enum SnapshotCommand {
             case let .badRecording(token):
                 "\"\(token)\": rec: needs a settings.json hotkey typed on a US keyboard (rec:cmd+1, rec:rcmd, rec:double:cmd)"
             case let .badWait(token): "\"\(token)\": wait takes 0…600000 milliseconds (wait:1500)"
+            case let .badSettingsTab(value):
+                "--settings-window takes \(SettingsTab.allCases.map(\.rawValue).joined(separator: ", ")), got \(value)"
+            case let .needsSettingsWindow(option): "\(option) needs --settings-window"
+            case let .launcherOnly(option): "\(option) is for the launcher, not --settings-window"
             }
         }
     }
@@ -106,6 +123,15 @@ enum SnapshotCommand {
     usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"]
                                 [--settings <jsonc>] [--screen 1512x982] [--theme <id>]
                                 [--report <json>]
+           SopranoCast snapshot --out <png> --settings-window <general|extensions|advanced>
+                                [--select <item-id|group:<group>>] [--filter "<text>"]
+                                [--record <item-id|launcher>] [--keys "<token> …"]
+                                [--settings <jsonc>] [--theme <id>] [--report <json>]
+      --settings-window renders the settings window (1120x700) instead of the launcher;
+        --select picks a row of Extensions (group:applications, group:quicklinks,
+        group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
+        an item id), --filter searches its table, --record opens the recorder card and
+        --keys replay into it.
       --keys tokens, separated by spaces, replayed after --query:
         named keys   return enter esc escape tab space delete backspace forwardDelete
                      up down left right home end pageUp pageDown f1 … f20
@@ -152,6 +178,13 @@ enum SnapshotCommand {
                     throw OptionError.badScreen(text)
                 }
                 options.screenSize = CGSize(width: width, height: height)
+            case "--settings-window":
+                let text = try value(option)
+                guard let tab = SettingsTab(rawValue: text) else { throw OptionError.badSettingsTab(text) }
+                options.settingsWindow = tab
+            case "--select": options.select = try value(option)
+            case "--filter": options.filter = try value(option)
+            case "--record": options.record = try value(option)
             default:
                 throw OptionError.unknownOption(option)
             }
@@ -159,6 +192,14 @@ enum SnapshotCommand {
         }
         guard let out else { throw OptionError.missingOut }
         options.out = out
+        if options.settingsWindow == nil {
+            for (option, value) in [("--select", options.select), ("--filter", options.filter), ("--record", options.record)] where value != nil {
+                throw OptionError.needsSettingsWindow(option)
+            }
+        } else {
+            if options.query != nil { throw OptionError.launcherOnly("--query") }
+            if arguments.contains("--screen") { throw OptionError.launcherOnly("--screen") }
+        }
         return options
     }
 
@@ -256,10 +297,14 @@ enum SnapshotCommand {
         }
     }
 
-    /// The testable core: the rendered image (screen size × 2) and the report.
+    /// The testable core: the rendered image (screen size × 2, or the settings window × 2)
+    /// and the report.
     static func render(_ options: Options) throws -> (image: CGImage, report: SnapshotReport) {
         _ = RetroFont.registerBundledFont()
         let store = try settingsStore(options)
+        if let tab = options.settingsWindow {
+            return try renderSettingsWindow(options, tab: tab, store: store)
+        }
         let screen = CGRect(origin: .zero, size: options.screenSize)
         let visible = CGRect(x: 0, y: 0, width: screen.width, height: screen.height - menuBarHeight)
         let support = FixturePresenterSupport(settingsStore: store, visibleFrame: visible)
@@ -313,6 +358,96 @@ enum SnapshotCommand {
             footerToast: state.footerToast
         )
         return (image, report)
+    }
+
+    /// The settings window on fixtures: the launcher (offscreen, never shown) supplies the
+    /// items as in the app; `--select`, `--filter`, `--record` and `--keys` drive it. The
+    /// report's `query` is the filter, `rows` the Extensions rows, `selected` the selected row,
+    /// `overlay` "recorder" or "none", `runs` what the window asked the app to do, and
+    /// `footerToast` the status line.
+    private static func renderSettingsWindow(_ options: Options, tab: SettingsTab, store: FixtureSettingsStore) throws -> (image: CGImage, report: SnapshotReport) {
+        let support = FixturePresenterSupport(
+            settingsStore: store,
+            visibleFrame: CGRect(origin: .zero, size: defaultScreenSize)
+        )
+        LauncherWindow.offscreen = true
+        let controller = LauncherController(
+            sources: [FixtureCatalog()],
+            icons: FixtureIcons(),
+            runner: FixtureRunner(),
+            presenter: LauncherWindow(),
+            hotkeys: FixtureHotkeys(),
+            environment: support.environment
+        )
+        let window = SettingsWindowController(
+            environment: support.settingsWindowEnvironment(items: { controller.allItems }),
+            icons: FixtureIcons(),
+            hotkeys: FixtureHotkeys(),
+            keyCode: LauncherController.layoutKeyCode
+        )
+        store.onChange = { [weak controller, weak window] in
+            controller?.settingsDidChange()
+            window?.settingsDidChange()
+        }
+        window.show(tab: tab)
+        if let filter = options.filter {
+            window.extensions.setFilter(filter)
+        }
+        if let select = options.select {
+            window.extensions.select(try selection(select, items: controller.allItems))
+        }
+        if let record = options.record {
+            let target: HotkeyTarget = record == "launcher" ? .launcher : .item(ItemID(rawValue: record))
+            let title = record == "launcher" ? "Soprano Cast" : controller.allItems.first { $0.id.rawValue == record }?.title
+            guard let title else { throw FixtureError(description: "--record: no item \(record)") }
+            window.recordHotkey(for: target, title: title)
+        }
+        var replay = KeyReplay(hyperIncludesShift: store.settings.hyperKey.includeShift)
+        for token in options.keys {
+            if case .wait(let milliseconds) = token {
+                try support.advance(milliseconds: milliseconds)
+                replay.pass(milliseconds: milliseconds)
+                continue
+            }
+            for event in replay.events(for: token) where window.isRecording {
+                window.receive(event)
+            }
+        }
+
+        guard let image = window.renderImage(scale: 2) else {
+            throw FixtureError(description: "the settings window did not render")
+        }
+        let selected: String? = switch window.extensions.selection {
+        case .group(let group)?: "group:\(group.rawValue)"
+        case .item(let id)?: id.rawValue
+        case nil: nil
+        }
+        let report = SnapshotReport(
+            query: window.extensions.filter,
+            rows: tab == .extensions ? window.extensions.listedIDs : [],
+            selected: tab == .extensions ? selected : nil,
+            overlay: window.isRecording ? "recorder" : "none",
+            runs: support.windowLog,
+            edits: store.edits,
+            footerToast: window.statusText
+        )
+        return (image, report)
+    }
+
+    /// `group:<group>` or an item id that exists among `items`.
+    private static func selection(_ text: String, items: [CastItem]) throws -> ExtensionsSettingsPane.Selection {
+        if text.hasPrefix("group:") {
+            let name = String(text.dropFirst("group:".count))
+            guard let group = ExtensionGroup(rawValue: name) else {
+                let known = ExtensionGroup.allCases.map { "group:\($0.rawValue)" }.joined(separator: ", ")
+                throw FixtureError(description: "--select: unknown group \(name) (\(known))")
+            }
+            return .group(group)
+        }
+        guard items.contains(where: { $0.id.rawValue == text }) else {
+            throw FixtureError(description: "--select: no item \(text)")
+        }
+        return .item(ItemID(rawValue: text))
     }
 
     /// `SettingsTemplate.text` or `--settings`, with `--theme` over it.

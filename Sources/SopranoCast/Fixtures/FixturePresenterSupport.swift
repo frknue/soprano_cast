@@ -38,6 +38,8 @@ final class FixturePresenterSupport {
     private(set) var history: [String] = FixturePresenterSupport.initialHistory
     /// Virtual time since `referenceDate`; only `advance(milliseconds:)` moves it.
     private(set) var elapsedMilliseconds = 0
+    /// What the settings window asked the app to do (open, reveal, choose a folder).
+    private(set) var windowLog: [String] = []
 
     private struct ScheduledWork {
         var sequence: Int
@@ -72,6 +74,30 @@ final class FixturePresenterSupport {
             saveUsage: { self.usage = $0 },
             loadHistory: { self.history },
             saveHistory: { self.history = $0 }
+        )
+    }
+
+    /// The folder the fixture folder picker always picks.
+    static let chosenFolder = "~/Scripts"
+
+    /// The settings window's environment over the same store and clock; `items` are the
+    /// launcher's. Opening, revealing and picking folders only log ("open settings.json",
+    /// "reveal settings.json", "choose folder").
+    func settingsWindowEnvironment(items: @escaping @MainActor () -> [CastItem]) -> SettingsWindowEnvironment {
+        SettingsWindowEnvironment(
+            settings: { [settingsStore] in settingsStore.settings },
+            issues: { [settingsStore] in settingsStore.issues },
+            settingsPath: "~/.config/soprano-cast/settings.json",
+            editSettings: { [settingsStore] edit in try settingsStore.apply(edit) },
+            items: items,
+            theme: { [settingsStore] in AppTheme.theme(for: settingsStore.settings.theme) },
+            schedule: { milliseconds, work in self.schedule(after: milliseconds, work) },
+            openSettingsFile: { self.windowLog.append("open settings.json") },
+            revealSettingsFile: { self.windowLog.append("reveal settings.json") },
+            chooseFolder: { completion in
+                self.windowLog.append("choose folder")
+                completion(Self.chosenFolder)
+            }
         )
     }
 
@@ -142,6 +168,13 @@ final class FixtureSettingsStore {
         case let .remove(path):
             edited = try SettingsEditor.removing(at: path, in: text)
             entry = "remove \(path.joined(separator: "."))"
+        case let .quicklink(id, fields?):
+            edited = try SettingsEditor.settingQuicklink(fields, id: id, in: text)
+            let written: [String: String] = ["name": fields.name, "link": fields.link, "openWith": fields.openWith, "icon": fields.icon]
+            entry = "set quicklinks[\(id)] = \(Self.json(written.filter { !$0.value.isEmpty }))"
+        case let .quicklink(id, nil):
+            edited = try SettingsEditor.removingQuicklink(id: id, in: text)
+            entry = "remove quicklinks[\(id)]"
         }
         let (resolved, issues) = try Self.resolve(edited, themeOverride: themeOverride)
         text = edited

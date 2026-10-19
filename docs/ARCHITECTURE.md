@@ -42,6 +42,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | `Sources/SopranoCast/System/` | System | App catalog, icons, app/quicklink/system/script execution, window manager, hotkey center + Hyper key. |
 | `Sources/SopranoCast/Launcher/` | Launcher | `LauncherController` and `LauncherWindow` (panel, search bar, list, footer, overlays, HUD). |
 | `Sources/SopranoCast/App/`, `Shell/` | Shell | `main.swift`, app delegate (composition root), menu bar, login item, settings/theme centers, app state store, permissions window, CLI. |
+| `Sources/SopranoCast/Settings/` | Settings | The settings window: tabs, panes, form chrome, recorder overlay. Reads and writes settings only through `SettingsWindowEnvironment` (`SettingsEdit`); reuses the launcher's `RecorderCardView` and `LauncherModelBuilder.recorderHint`/`conflictText`. |
 | `Sources/SopranoCast/Fixtures/` | Fixtures | Fake catalog/runner/hotkeys and the `snapshot` harness. |
 
 ### Contract files (shared interfaces; change only together with every consumer)
@@ -52,7 +53,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 - `Core/Launcher.swift` — `SectionKind`, `RankedItem`, `ResultSection`, `ItemAction`, `LauncherContext`, `LauncherCommand`, `RecorderUpdate`, `RunOutcome`, `CalculatorResult`, `UsageRecord`.
 - `Core/CLIProtocol.swift`, `Core/Geometry.swift` (Quartz ↔ AppKit).
 - `System/SystemContracts.swift` — `ItemSource`, `IconProviding`, `ItemRunning`, `HotkeyRegistering`, `HotkeyFailure`, `WindowManaging`.
-- `Launcher/LauncherContracts.swift` — view models, `LauncherPresenting`, `SettingsEdit`, `LauncherEnvironment`.
+- `Launcher/LauncherContracts.swift` — view models, `LauncherPresenting`, `SettingsEdit` (`set`, `remove`, `quicklink`), `LauncherEnvironment`.
 
 (`Core/` = `Sources/SopranoCastCore/`; `System/`, `Launcher/`, `App/`, `Shell/`, `Fixtures/` =
 `Sources/SopranoCast/…`; tests in `Tests/SopranoCastTests/`.)
@@ -62,8 +63,8 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | Owner | Files |
 |---|---|
 | Infra | `Package.swift`, `.gitignore`, `LICENSE`, `Support/*`, `scripts/*`, `Sources/SopranoCast/Resources/`, both `Vendored/` dirs, `App/SopranoResources.swift` |
-| Core keys | `Core/KeyParsing.swift`, `Core/HotkeyParsing.swift`, `Core/HotkeyRecorder.swift`, `Core/ModifierGestureDetector.swift`, `Core/HotkeyConflicts.swift`; tests `KeyParsingTests`, `HotkeyParsingTests`, `HotkeyRecorderTests`, `ModifierGestureDetectorTests`, `HotkeyConflictsTests` |
-| Core settings | `Core/SettingsResolver.swift`, `Core/SettingsTemplate.swift`, `Core/SettingsEditor.swift`; tests `SettingsResolverTests`, `SettingsTemplateTests`, `SettingsEditorTests` |
+| Core keys | `Core/KeyParsing.swift`, `Core/HotkeyParsing.swift`, `Core/HotkeyRecorder.swift`, `Core/HotkeyRecordingSession.swift`, `Core/ModifierGestureDetector.swift`, `Core/HotkeyConflicts.swift`; tests `KeyParsingTests`, `HotkeyParsingTests`, `HotkeyRecorderTests`, `HotkeyRecordingSessionTests`, `ModifierGestureDetectorTests`, `HotkeyConflictsTests` |
+| Core settings | `Core/SettingsResolver.swift`, `Core/SettingsTemplate.swift`, `Core/SettingsEditor.swift`, `Core/SettingsChanges.swift`, `Core/ExtensionsTable.swift`; tests `SettingsResolverTests`, `SettingsTemplateTests`, `SettingsEditorTests`, `ExtensionsTableTests` |
 | Core search | `Core/SearchMatcher.swift`, `Core/Ranker.swift`, `Core/Frecency.swift`, `Core/SearchHistory.swift`, `Core/Calculator.swift`; tests `SearchMatcherTests`, `RankerTests`, `FrecencyTests`, `SearchHistoryTests`, `CalculatorTests` |
 | Core commands | `Core/BuiltinItems.swift`, `Core/ItemActions.swift`, `Core/QuicklinkTemplate.swift`, `Core/ScriptMetadataParser.swift`, `Core/ScriptOutput.swift`, `Core/WindowLayout.swift`; tests `BuiltinItemsTests`, `ItemActionsTests`, `QuicklinkTemplateTests`, `ScriptMetadataParserTests`, `ScriptOutputTests`, `WindowLayoutTests` |
 | Core launcher | `Core/LauncherKeyRouter.swift`, `Core/ResultNavigator.swift`; tests `LauncherKeyRouterTests`, `ResultNavigatorTests` |
@@ -74,6 +75,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | Launcher views | `Launcher/LauncherWindow.swift`, `Launcher/LauncherPanel.swift`, `Launcher/SearchBarView.swift`, `Launcher/ResultListView.swift`, `Launcher/FooterView.swift`, `Launcher/OverlayViews.swift`, `Launcher/HUDWindow.swift`; tests `LauncherWindowTests` |
 | Launcher controller | `Launcher/LauncherController.swift`, `Launcher/LauncherModelBuilder.swift`; tests `LauncherControllerTests`, `LauncherModelBuilderTests`, `LauncherTestSupport` |
 | Shell | `main.swift`, `App/AppDelegate.swift`, `App/MenuBarController.swift`, `App/LoginItem.swift`, `App/CLIServer.swift`, `App/CLIClient.swift`, `Shell/SettingsFile.swift`, `Shell/SettingsCenter.swift`, `Shell/ThemeCenter.swift`, `Shell/AppStateStore.swift`, `Shell/Permissions.swift`, `Shell/PermissionsWindowController.swift`; tests `SettingsCenterTests`, `AppStateStoreTests`, `CLIRoundTripTests`, `PermissionsWindowTests` |
+| Settings | `Settings/SettingsWindowController.swift`, `Settings/SettingsChrome.swift`, `Settings/GeneralSettingsPane.swift`, `Settings/ExtensionsSettingsPane.swift`, `Settings/AdvancedSettingsPane.swift`; tests `SettingsWindowTests` |
 | Fixtures | `Fixtures/FixtureCatalog.swift`, `Fixtures/FixtureIcons.swift`, `Fixtures/FixtureRunner.swift`, `Fixtures/FixtureHotkeys.swift`, `Fixtures/FixturePresenterSupport.swift`, `Fixtures/SnapshotCommand.swift`; tests `FixtureCatalogTests`, `SnapshotCommandTests` |
 
 ## Core APIs
@@ -181,6 +183,35 @@ side) tapped again with its press within `doubleTapWindow` of the previous relea
 `.doubleTap`; left and right of one modifier (and nothing else) down at the same time →
 `.bothSides`; both sides plus other modifiers → `.pending(display: [])`. Each `.recorded`
 replaces `recorded`.
+
+### Recording session (`HotkeyRecordingSession.swift`)
+
+```swift
+public struct HotkeyRecordingSession: Sendable {
+    public static let countdownMilliseconds: Int   // 1500
+    public static let tickMilliseconds: Int        // 100
+    public enum Keys: Equatable, Sendable { case spec(HotkeySpec), display([String]) }
+    public enum Step: Equatable, Sendable {
+        case none, redraw, startCountdown, save(HotkeySpec, takingFrom: HotkeyTarget?), clear, close
+    }
+    public let target: HotkeyTarget
+    public private(set) var keys: Keys
+    public private(set) var recorded: HotkeySpec?
+    public private(set) var owner: HotkeyTarget?
+    public init(target: HotkeyTarget, current: HotkeySpec?)
+    public mutating func handle(_ event: KeyEvent, owner: (HotkeySpec) -> HotkeyTarget?) -> Step
+    public func commit(owner: (HotkeySpec) -> HotkeyTarget?) -> Step
+}
+```
+
+One recording for both hosts (the launcher's recorder card, the settings window); hosts
+own the countdown timer and the writes, and pass an `owner` lookup that skips the target.
+Starts on `current` (`.spec`, or `.display([])`). `.pending` → keys = display, recorded
+and owner nil, `.redraw` (a running countdown stops). `.recorded` → keys = spec, owner =
+`owner(spec)`; `.redraw` when the launcher holds it (it can't be taken), else
+`.startCountdown`. `.cleared` → `.clear`; `.cancelled` → `.close`; `.commit` → `commit`;
+`.unchanged` → `.none`. `commit`: nothing recorded → `.close`; the launcher holds it →
+`.none`; else `.save(spec, takingFrom: owner)` (the host removes the owner's entry first).
 
 ### Modifier gestures (`ModifierGestureDetector.swift`)
 
@@ -295,6 +326,62 @@ the JSONC parse error, each with its line.
 Known upstream issue: the vendored `JSONCText` `removing` of an object's last member
 deletes from the previous member's comma, so a trailing comment on the line before (and
 comment lines in between) is lost. The fix belongs in Soprano, then a re-sync.
+
+### Settings window model (`SettingsChanges.swift`, `ExtensionsTable.swift`, `SettingsEditor.swift`)
+
+```swift
+extension CastSettings {
+    public func disabledIDs(setting id: ItemID, enabled: Bool) -> [String]        // sorted raw ids
+    public func favoriteIDs(toggling id: ItemID) -> [String]                       // removes, else appends
+    public func favoriteIDs(moving id: ItemID, by offset: Int) -> [String]?        // nil past either end
+    public func fallbackIDs(toggling id: ItemID) -> [String]
+    public func fallbackIDs(moving id: ItemID, by offset: Int) -> [String]?
+}
+public enum AliasText {
+    public static let charactersError: String   // "Use only a–z, 0–9 and spaces"
+    public static func isValid(_ text: String) -> Bool
+}
+public enum QuicklinkID { public static func make(for name: String, existing: Set<String>) -> String }
+public struct QuicklinkFields: Equatable, Sendable {
+    public var name: String, link: String, openWith: String, icon: String   // blank openWith/icon = none
+    public init(name: String = "", link: String = "", openWith: String = "", icon: String = "")
+    public init(_ quicklink: Quicklink)
+    public var problem: String?   // "A quicklink needs a name" / "A quicklink needs a link"
+}
+extension SettingsEditor {
+    public static func settingQuicklink(_ fields: QuicklinkFields, id: String, in text: String) throws -> String
+    public static func removingQuicklink(id: String, in text: String) throws -> String
+}
+public enum ExtensionGroup: String, CaseIterable, Sendable {
+    case applications, quicklinks, scriptCommands, sopranoCast, system, windowManagement
+    public init?(kind: ItemKind)   // nil for the calculator
+    public var title: String
+}
+public struct ExtensionRow: Equatable, Sendable {
+    public var item: CastItem, alias: String?, hotkey: HotkeySpec?
+    public var isEnabled: Bool, isFavorite: Bool, isFallback: Bool
+    public init(item: CastItem, settings: CastSettings)
+    public var typeLabel: String
+}
+public struct ExtensionSection: Equatable, Sendable { public var group: ExtensionGroup; public var rows: [ExtensionRow] }
+public enum ExtensionsTable {
+    public static func sections(items: [CastItem], settings: CastSettings, filter: String = "") -> [ExtensionSection]
+}
+```
+
+Rules: the launcher's actions and the settings window compute the values they write with
+these helpers. `SettingsResolver.aliasCharacters` and `quicklinkIDCharacters` are the
+public character sets. Quicklink ids: the name folded (case, accents), its runs of a–z and
+0–9 joined by "-" ("quicklink" when there are none), then "-2", "-3", … until unused.
+`settingQuicklink` replaces the entry with that id in the document's raw "quicklinks"
+array (its other keys kept; trimmed name and link; blank `openWith`/`icon` removed) or
+appends `{id, name, link, openWith?, icon?}`; every other entry stays as written, even one
+the resolver drops (the array re-renders with sorted keys). `removingQuicklink` drops every
+entry with that id. `ExtensionsTable.sections`: items deduplicated by id, the calculator
+left out, groups in `ExtensionGroup` order, rows by `localizedStandardCompare` title then
+id; without a filter every group is listed, empty ones too; a filter keeps rows whose
+title, subtitle, alias, type label or id contain each of its words (case- and
+accent-insensitive) and drops empty groups.
 
 ### Search (`SearchMatcher.swift`, `Ranker.swift`, `Frecency.swift`, `SearchHistory.swift`, `Calculator.swift`)
 
@@ -707,8 +794,12 @@ script catalog after building the controller (the controller never starts its so
     init(sources: [ItemSource], icons: IconProviding, runner: ItemRunning, presenter: LauncherPresenting,
          hotkeys: HotkeyRegistering, environment: LauncherEnvironment)
     var isVisible: Bool { get }
-    /// Every item Root Search can list right now (sources + `BuiltinItems`), for the CLI.
+    /// Every item Root Search can list right now (sources + `BuiltinItems`), for the CLI
+    /// and the settings window.
     var allItems: [CastItem] { get }
+    /// Called after a source changed `allItems`; settings changes rebuild them inside
+    /// `settingsDidChange()`.
+    var onItemsChange: (() -> Void)?
     func toggle()
     func show()
     func hide()
@@ -743,7 +834,8 @@ Controller behavior:
   starts them (the app delegate does). Ranks with `Ranker.sections` on every query change
   (calculator from `Calculator.evaluate(query, locale: .current)`); selection resets to the
   first row on a query change.
-- Keys: `presenter.onKeyEvent` → in `.hotkeyRecorder` every event goes to `HotkeyRecorder`;
+- Keys: `presenter.onKeyEvent` → in `.hotkeyRecorder` every event goes to its
+  `HotkeyRecordingSession`;
   else `LauncherKeyRouter.command(for:input:)` → execute → true; nil → false.
 - **runPrimary**: the selected row's primary action. An item with required arguments whose
   fields are empty focuses the first empty field instead (a toast "Fill in <argument
@@ -762,20 +854,21 @@ Controller behavior:
   Configure Command (heading "Configure Command") opens `configureActions` in the same
   panel. Favorites, disable and configure ignore the calculator row.
 - **Settings actions** (all through `environment.editSettings`; the settings center reloads
-  and calls `settingsDidChange`): toggleFavorite appends/removes in `favorites`;
-  moveFavoriteUp/Down swaps; disableCommand adds to `disabled` (written sorted; toast
-  "Disabled <title>"); setHotkey opens the recorder overlay (calls `hotkeys.suspend()`;
-  shows the current hotkey, "recording…" with none; every `.recorded` shows keycaps and the
-  owner from `HotkeyConflicts.owner` in red ("Used by <title>", or the raw id when the item
-  is gone); the launcher's own hotkey shows "Used by Soprano Cast", gets no countdown and
-  can't be saved; a recorded spec starts a 1.5 s countdown (100 ms ticks) that saves
-  `hotkeys.<id>`, overwriting a conflicting owner by removing its entry; `.commit` saves now
-  (closes when nothing was recorded); `.cleared` removes and closes; `.cancelled` closes;
+  and calls `settingsDidChange`; values from the `CastSettings` helpers): toggleFavorite
+  appends/removes in `favorites`; moveFavoriteUp/Down swaps; disableCommand adds to
+  `disabled` (written sorted; toast "Disabled <title>"); setHotkey opens the recorder
+  overlay over a `HotkeyRecordingSession` targeting the item (calls `hotkeys.suspend()`;
+  shows the current hotkey, "recording…" with none, held keycaps, then recorded keycaps with
+  the owner in red ("Used by <title>", or the raw id when the item is gone; "Used by Soprano
+  Cast" for the launcher's own hotkey, which gets no countdown and can't be saved);
+  `.startCountdown` runs `countdownMilliseconds` with a bar advanced every
+  `tickMilliseconds`, then commits; `.save` writes `hotkeys.<id>` after removing the taken
+  owner's entry; `.clear` removes `hotkeys.<id>` (when set) and closes; `.close` closes;
   `hotkeys.resume()` on leaving); deleteHotkey removes; setAlias opens the alias editor
-  (prefilled, lowercased as typed; other characters than a–z, 0–9, space show "Use only
-  a–z, 0–9 and spaces" and block ↵), ↵ saves the trimmed `aliases.<id>` (empty removes);
-  deleteAlias removes. Write errors toast "settings.json line <n>: <message>" or "Couldn't
-  edit settings.json".
+  (prefilled, lowercased as typed; characters `AliasText.isValid` refuses show
+  `AliasText.charactersError` and block ↵), ↵ saves the trimmed `aliases.<id>` (empty
+  removes); deleteAlias removes. Write errors toast "settings.json line <n>: <message>" or
+  "Couldn't edit settings.json".
 - **back** (Esc): closes the topmost overlay; with none, closes the window. **popToRoot**:
   clears query, arguments, overlays, selection. **closeWindow** hides. `hide()` drops
   overlays and toasts and resets the history cursor; the query, selection and arguments
@@ -817,7 +910,7 @@ Controller behavior:
   single-instance guard (a second instance terminates); `SettingsCenter.shared.start()`;
   `ThemeCenter.shared.start()`; `LiveAppCatalog`, `ScriptCatalog` (sharing the
   `ScriptRunner`), `LiveIconProvider`, `LiveWindowManager`, `SystemCommandRunner`,
-  `LiveItemRunner` (cast commands: openSettings → `SettingsCenter.openInEditor()`,
+  `LiveItemRunner` (cast commands: openSettings → the settings window,
   reloadScripts → HUD "Reloaded script directories", quit), `HotkeyCenter`,
   `HyperKeyController`, `LauncherWindow`, `LauncherController` with an environment over
   `SettingsCenter`, `ThemeCenter`, `AppStateStore` (UserDefaults) and
@@ -828,12 +921,43 @@ Controller behavior:
   when the bindings or the Hyper key changed; failures are logged and shown in the menu.
   While a hotkey or the Hyper key failed and Accessibility is missing, a 1 s poll re-applies
   everything once it is granted. Settings changes also update the catalogs' folders, the
-  controller, the menu and (when `startAtLogin` changed) `LoginItem.sync`. On quit: Hyper
+  controller, the menu, the settings window and (when `startAtLogin` changed)
+  `LoginItem.sync`; theme changes the controller and the settings window. On quit: Hyper
   key removed; the CLI server, the poll, the catalogs and the settings watcher stopped.
   `MenuBarController`; `CLIServer`. First launch (once ever, `didRequestPermissions` in
   `UserDefaults.standard`): when Accessibility is missing, macOS's prompt plus the
   permissions window; later launches never open it themselves. Reopen (Spotlight/Finder)
   → `toggle()`.
+- `SettingsWindowController(environment: SettingsWindowEnvironment, icons:, hotkeys:,
+  keyCode:)` (Settings/): created by the app delegate on the first `openSettings` (the
+  command, `⌘,` in the launcher, Settings… in the menu) with an environment over
+  `SettingsCenter` (settings, issues, `displayPath`, `edit`, `openInEditor`, Reveal in
+  Finder of `fileURL`), the controller's `allItems`, `ThemeCenter`, the shared scheduler
+  and an `NSOpenPanel` folder sheet (paths in the home folder as "~/…"); its own
+  `LiveIconProvider` (the launcher's `onLoad` is taken); the `HotkeyCenter`;
+  `LauncherController.layoutKeyCode`. `present(tab:)` activates the app and orders the
+  window front. It redraws on `settingsDidChange()` (only when settings, issues or items
+  differ), `itemsDidChange()` (the controller's `onItemsChange`) and `themeDidChange()`.
+  Tabs: General (settings.json card with issue rows, Open settings.json, Reveal in Finder;
+  `app.startAtLogin`, `launcher.hotkey`, `app.showMenuBarIcon`, `theme` ("Follow Soprano"
+  = "soprano"); `favorites` and `fallbacks` with ↑ ↓ ✕), Extensions (`ExtensionsTable` with
+  collapsible groups and a filter; alias field, hotkey keycaps (click records) and Enabled
+  box per row; the detail pane writes alias, hotkey, `disabled`, `favorites`, `fallbacks`,
+  quicklinks (`.quicklink` edits; Create picks `QuicklinkID.make`; Delete also drops the
+  quicklink's hotkey, alias and list entries), `applicationDirectories` /
+  `scriptDirectories` (added once, removed by position), `windowManagement.gap` /
+  `halves`), Advanced (`launcher.screen`, `popToRootSeconds` (presets 0, 30, 90, 180, 300,
+  600, 3600 plus the current value), `navigation`, `closeOnFocusLoss`; `hyperKey.trigger`
+  (none writes `null`; any trigger but Caps Lock also resets `quickPress` to `nothing`),
+  `includeShift`, `quickPress` (enabled with Caps Lock only)). Hotkeys record in the
+  launcher's recorder card over the dimmed window with a `HotkeyRecordingSession`
+  (`hotkeys.suspend()` while open): `.save` writes `hotkeys.<id>` or `launcher.hotkey`
+  after removing a taken item's entry; `.clear` removes `hotkeys.<id>` or sets
+  `launcher.hotkey` to `null` (removing it would bring back ⌘Space); a click beside the
+  card cancels. `SettingsWindow` routes keyDown/keyUp/flagsChanged to the recorder first
+  (so ⌘W and ⌘C record) and otherwise handles ⌘W, ⌘X/C/V/A, ⌘Z/⇧⌘Z itself (there is no
+  main menu). An alias with other characters, a quicklink without name or link and write
+  errors show in the sidebar's status line ("settings.json line <n>: <message>").
 - `SettingsFile` / `SettingsCenter` / `ThemeCenter`: Soprano Tab's
   (`~/git/private/soprano-tab/Sources/SopranoTab/Shell/`) with Cast names: path
   `SOPRANO_CAST_CONFIG` > `$XDG_CONFIG_HOME/soprano-cast/settings.json` >
@@ -845,11 +969,11 @@ Controller behavior:
   Soprano's settings (`SOPRANO_CONFIG` > `$XDG_CONFIG_HOME/soprano/` > `~/.config/soprano/`).
 - `AppStateStore(defaults: UserDefaults = .standard)`: usage records and search history as
   JSON data under `castUsage` / `castHistory` (unreadable data → empty).
-- `MenuBarController(controller:settings:hotkeyProblems:openPermissions:)`: status item (18 pt
+- `MenuBarController(controller:settings:hotkeyProblems:openPermissions:openSettings:)`: status item (18 pt
   programmatic template icon: a square with a slanted beam, tooltip "Soprano Cast"), menu:
   "Open Soprano Cast" (`show()`; the launcher hotkey as key equivalent, or appended as
   keycaps after two spaces for modifier gestures, fn combos and physical keys the layout
-  types nothing with), "Settings…" (⌘,), a disabled "settings.json: N warning(s)" line
+  types nothing with), "Settings…" (⌘,; the settings window), a disabled "settings.json: N warning(s)" line
   (errors count; tooltip `line N: <message>` per issue), a disabled "N hotkey(s) need(s)
   attention" line (failures plus a failed Hyper key; tooltip `<shape> <title>: <reason>`,
   `Hyper key: <error>`), "Permissions…", "Launch at Login" (checkmark; writes
@@ -900,12 +1024,25 @@ offscreen (no Dock icon, no state; settings default to `SettingsTemplate.text`, 
 visible frame is the screen minus a 33 pt menu bar), shows the launcher, types `--query`
 through `onQueryChange`, replays `--keys` through `onKeyEvent` (keys the launcher doesn't
 consume type into the focused field; replay stops once the launcher closes), and writes
-`renderSnapshot` at 2× over a backdrop. Usage, verbatim:
+`renderSnapshot` at 2× over a backdrop. With `--settings-window <tab>` it instead builds a
+`SettingsWindowController` on the same fixtures (items from an offscreen controller, folder
+picks return "~/Scripts"), shows the tab, applies `--filter` and `--select` (Extensions),
+opens the recorder for `--record` (`launcher` or an item id), replays `--keys` into it and
+writes `renderImage` (1120 × 700 at 2×). Usage, verbatim:
 
 ```text
 usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"]
                             [--settings <jsonc>] [--screen 1512x982] [--theme <id>]
                             [--report <json>]
+       SopranoCast snapshot --out <png> --settings-window <general|extensions|advanced>
+                            [--select <item-id|group:<group>>] [--filter "<text>"]
+                            [--record <item-id|launcher>] [--keys "<token> …"]
+                            [--settings <jsonc>] [--theme <id>] [--report <json>]
+  --settings-window renders the settings window (1120x700) instead of the launcher;
+    --select picks a row of Extensions (group:applications, group:quicklinks,
+    group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
+    an item id), --filter searches its table, --record opens the recorder card and
+    --keys replay into it.
   --keys tokens, separated by spaces, replayed after --query:
     named keys   return enter esc escape tab space delete backspace forwardDelete
                  up down left right home end pageUp pageDown f1 … f20
@@ -922,9 +1059,15 @@ usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"
 ```
 
 `--report` writes JSON (sorted keys, explicit nulls): `query`, `rows` (ids), `selected`,
-`overlay`, `runs` (`FixtureRunner` log), `edits` (`set hotkeys.<id> = "…"`, `remove …`),
-`footerToast`. Option errors print "snapshot: <error>" plus the usage and exit 2; render
-failures exit 1; success prints the PNG path.
+`overlay`, `runs` (`FixtureRunner` log), `edits` (`set hotkeys.<id> = "…"`, `remove …`,
+`set quicklinks[<id>] = {…}`), `footerToast`. In settings-window mode `query` is the
+filter, `rows` the Extensions rows (`group:<group>` or item ids), `selected` the selected
+row, `overlay` "recorder" or "none", `runs` what the window asked the app to do ("open
+settings.json", "reveal settings.json", "choose folder") and `footerToast` the status line.
+`--select`, `--filter` and `--record` need `--settings-window`; `--query` and `--screen`
+are launcher-only. Option errors print "snapshot: <error>" plus the usage and exit 2;
+render failures (an unknown `--select`/`--record` item included) exit 1; success prints
+the PNG path.
 
 ## Visual design
 
@@ -963,6 +1106,25 @@ Vendored chrome only: `ThemeColors` tokens (+ `bgSelected`, `bgSelectedStrong`,
 - **HUD**: a borderless panel 1/6 up from the display bottom, `bgRaised`, `borderStrong`,
   display 11 text, fades out after 1.5 s.
 - **Empty**: display 22 `textMuted` centered in the list area.
+- **Settings window** 1120 × 700 (minimum 1000 × 560), titled "Soprano Cast Settings",
+  `bgBase`: a 180 pt `bgPanel` sidebar (`borderStrong` hairline) of 34 pt tab keys (SF
+  Symbol + display 11 title; the active one a lit `accent` block with `bgPanel` ink) and a
+  status line at its bottom (body 11, `danger` for errors, gone after 4 s). General and
+  Advanced use Soprano's settings column (≤ 660 wide): tab header (display 22 + body 11),
+  sections as a lowercase `RetroHeadingView` over a `bgPanel` card with a `borderStrong`
+  hairline and 30 pt rows (display 11 label left, control right, `borderSubtle` hairlines
+  between), issue rows tinted `yellow` / `danger`, `RetroButton`s, keycap chips (20 high,
+  `bgRaised`, `borderStrong`, display 11; `accent` edges on hover; "record hotkey" muted
+  when empty). Extensions: a 52 pt top bar (search field 260 wide, "N commands" display 11
+  right), column titles (display 11 `textMuted`) over a hairline, the table (group rows 28
+  high on `bgPanel` with a chevron, display 11 title and body 11 count; command rows 32
+  high: 18 pt icon + body 13 title, muted when disabled; type body 12 `textMuted`; alias
+  body 12 `accent`; keycaps; Enabled checkbox; "add alias" and "record" show on the
+  selected row only, which is `bgSelectedStrong` with a 2 pt `accent` rail), and a 320 pt
+  detail pane after a `borderStrong` rule (32 pt icon, body 15 title, display 11 type, body
+  11 subtitle and id, cards with 140 pt controls; destructive keys framed and inked in
+  `danger`). The recorder dims the window with `bgBase` at 0.72 under the launcher's
+  `RecorderCardView`.
 
 ## Tests
 
@@ -975,8 +1137,7 @@ defaults; system tests cover pure parts only. Test consumer-visible behavior, no
 
 No Raycast `.rayconfig` importer exists yet: Raycast's export never produced a file to
 build against, so the user's setup was migrated into settings.json by hand (ROADMAP).
-Family conventions replace: the Settings window (settings.json, live reloaded; hotkeys
-and aliases also set from the Action Panel), Cloud Sync, the account, AI, the extension
-Store, and themes (Soprano themes). Later phases (docs/ROADMAP.md): clipboard history,
+Family conventions replace: Cloud Sync, the account, AI, the extension Store, and themes
+(Soprano themes). Later phases (docs/ROADMAP.md): clipboard history,
 snippets, file search, floating notes, emoji picker, window layouts and custom window
 commands, move to Space, Resize/Move Window with typed values, unit/currency conversion.

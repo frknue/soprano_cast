@@ -22,18 +22,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let settings: SettingsCenter
     private let hotkeyProblems: @MainActor () -> HotkeyProblems
     private let openPermissions: @MainActor () -> Void
+    private let openSettings: @MainActor () -> Void
     private var statusItem: NSStatusItem?
 
     init(
         controller: LauncherController,
         settings: SettingsCenter = .shared,
         hotkeyProblems: @escaping @MainActor () -> HotkeyProblems,
-        openPermissions: @escaping @MainActor () -> Void
+        openPermissions: @escaping @MainActor () -> Void,
+        openSettings: @escaping @MainActor () -> Void
     ) {
         self.controller = controller
         self.settings = settings
         self.hotkeyProblems = hotkeyProblems
         self.openPermissions = openPermissions
+        self.openSettings = openSettings
         super.init()
         apply()
     }
@@ -72,7 +75,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         menu.addItem(open)
         menu.addItem(.separator())
-        menu.addItem(item("Settings…", action: #selector(openSettingsFile), key: ","))
+        menu.addItem(item("Settings…", action: #selector(openSettingsWindow), key: ","))
 
         let issues = settings.issues
         if !issues.isEmpty {
@@ -200,8 +203,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         controller.show()
     }
 
-    @objc private func openSettingsFile() {
-        settings.openInEditor()
+    @objc private func openSettingsWindow() {
+        openSettings()
     }
 
     @objc private func showPermissions() {

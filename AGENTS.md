@@ -22,6 +22,7 @@ swift test --filter LauncherKeyRouterTests
 ./scripts/install.sh                 # release build → /Applications/Soprano Cast.app
 .build/debug/SopranoCast snapshot --out /tmp/cast.png --query "chr" --report /tmp/cast.json
 .build/debug/SopranoCast snapshot --out /tmp/rec.png --query "chrome" --keys "shift+cmd+, return rec:cmd+1 wait" --report /tmp/rec.json
+.build/debug/SopranoCast snapshot --out /tmp/settings.png --settings-window extensions --select app:com.google.Chrome --report /tmp/settings.json
 .build/debug/SopranoCast list        # no bundle → port com.soprano.cast.cli: talks to the INSTALLED app
 ```
 
@@ -35,14 +36,23 @@ formatter; match surrounding style.
   real `LauncherController` and `LauncherWindow` on fixtures (14 apps, 3 script commands,
   fixed time, usage and history), with no Dock icon, hotkey, permission or persisted
   state; `--report` writes query, row ids, selected id, overlay, footer toast, the
-  runner's log and settings edits as JSON. Virtual time stands still unless a `wait`
-  token lets it pass, so a recorded hotkey only saves after `wait`. Usage
-  (`SnapshotCommand.usage`):
+  runner's log and settings edits as JSON. `--settings-window <tab>` renders the settings
+  window on the same fixtures instead. Virtual time stands still unless a `wait` token lets
+  it pass, so a recorded hotkey only saves after `wait`. Usage (`SnapshotCommand.usage`):
 
   ```text
   usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"]
                               [--settings <jsonc>] [--screen 1512x982] [--theme <id>]
                               [--report <json>]
+         SopranoCast snapshot --out <png> --settings-window <general|extensions|advanced>
+                              [--select <item-id|group:<group>>] [--filter "<text>"]
+                              [--record <item-id|launcher>] [--keys "<token> …"]
+                              [--settings <jsonc>] [--theme <id>] [--report <json>]
+    --settings-window renders the settings window (1120x700) instead of the launcher;
+      --select picks a row of Extensions (group:applications, group:quicklinks,
+      group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
+      an item id), --filter searches its table, --record opens the recorder card and
+      --keys replay into it.
     --keys tokens, separated by spaces, replayed after --query:
       named keys   return enter esc escape tab space delete backspace forwardDelete
                    up down left right home end pageUp pageDown f1 … f20
@@ -97,6 +107,9 @@ copied or not built yet; `docs/STATUS.md` the current state.
 - `Sources/SopranoCast/App/`, `Shell/` — `main.swift`, app delegate (composition root),
   menu bar, login item, settings and theme centers, app state store, permissions window,
   CLI server/client.
+- `Sources/SopranoCast/Settings/` — the settings window (General, Extensions, Advanced):
+  reads and writes settings.json only through `SettingsWindowEnvironment`, records hotkeys
+  with the launcher's `HotkeyRecordingSession` and recorder card.
 - `Sources/SopranoCast/Fixtures/` — fake catalog, runner, hotkeys and the `snapshot`
   harness.
 - `Sources/SopranoCast/Vendored/`, `Sources/SopranoCastCore/Vendored/` — Soprano chrome
@@ -116,11 +129,11 @@ copied or not built yet; `docs/STATUS.md` the current state.
   consumer.
 - Settings live only in `~/.config/soprano-cast/settings.json`
   (`$XDG_CONFIG_HOME/soprano-cast/` when set; `SOPRANO_CAST_CONFIG` overrides the path).
-  A new setting needs its type in `Settings.swift`, the resolver, the template, the README
-  settings section, and a changelog line. App state (usage records, search history) lives
-  in `UserDefaults` under `castUsage` / `castHistory`, injected so tests never touch the
-  user's defaults; the only other key is `didRequestPermissions` (first-launch prompt, in
-  `UserDefaults.standard`).
+  A new setting needs its type in `Settings.swift`, the resolver, the template, a control
+  in the settings window, the README settings section, and a changelog line. App state
+  (usage records, search history) lives in `UserDefaults` under `castUsage` /
+  `castHistory`, injected so tests never touch the user's defaults; the only other key is
+  `didRequestPermissions` (first-launch prompt, in `UserDefaults.standard`).
 - Tests: swift-testing, one `struct …Tests` per file, sentence-style names. Test files
   `import AppKit`, never `Foundation` (the `_Testing_Foundation` overlay breaks the build).
   Tests never touch real settings, real apps, hotkeys, the keychain or the user's defaults:

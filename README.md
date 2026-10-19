@@ -44,9 +44,10 @@ over), so only one of them gets each. Quit Raycast, and remove it from your logi
 Spotlight's `⌘Space` too (System Settings → Keyboard → Keyboard Shortcuts → Spotlight) if it
 is still on.
 
-Then set your hotkeys again: select the item, `⇧⌘,` → Set Hotkey…, and press the keys; or
-write them under `hotkeys` in settings.json. Aliases and favorites work the same way. There
-is no importer for Raycast's export yet.
+Then set your hotkeys again: in Settings (`⌘,`) → Extensions, click a command's hotkey and
+press the keys; or select the item in the launcher, `⇧⌘,` → Set Hotkey…; or write them
+under `hotkeys` in settings.json. Aliases and favorites work the same way. There is no
+importer for Raycast's export yet.
 
 ## Root Search
 
@@ -114,7 +115,7 @@ them; later it starts fresh. `⌘⎋` clears it right away.
 | `⌥↵` | Tertiary action (apps: Copy Path) |
 | `⌘K` | Action Panel |
 | `⇧⌘,` | Configure Command (hotkey and alias) |
-| `⌘,` | Open settings.json |
+| `⌘,` | Settings window |
 | `⌘F` | Add to / remove from Favorites |
 | `⇧⌘↑` / `⇧⌘↓` | Move favorite up / down |
 | `⇧⌘D` | Disable command (hides it from Root Search) |
@@ -285,8 +286,8 @@ and macOS resets them at logout. Needs Accessibility.
   that half: `stay`, `cycleSizes` (½ → ⅔ → ⅓ → ½) or `moveToDisplay` (on to the opposite
   half of the next display in that direction; on the outermost display it stays).
 
-**Soprano Cast** (`cast:<id>`): Soprano Cast Settings (`openSettings`, opens
-settings.json), Reload Script Directories (`reloadScripts`), Search Google
+**Soprano Cast** (`cast:<id>`): Soprano Cast Settings (`openSettings`, opens the settings
+window), Reload Script Directories (`reloadScripts`), Search Google
 (`searchGoogle`), Search DuckDuckGo (`searchDuckDuckGo`), Quit Soprano Cast (`quit`). The
 two search commands take a Query argument.
 
@@ -360,9 +361,30 @@ echo "Hello, $1"
 Settings live in `~/.config/soprano-cast/settings.json` (`$XDG_CONFIG_HOME/soprano-cast/`
 when `XDG_CONFIG_HOME` is set; `SOPRANO_CAST_CONFIG` overrides the whole path). The file
 is created with comments on first launch, accepts comments and trailing commas, may be a
-symlink (a dotfiles link survives), and reloads as soon as you save it. Open it with `⌘,`
-in the launcher, Settings… in the menu, or Soprano Cast Settings. Every key is optional;
-the Action Panel edits the same file and keeps your comments.
+symlink (a dotfiles link survives), and reloads as soon as you save it. Every key is
+optional; the settings window and the Action Panel edit the same file and keep your
+comments and key order.
+
+### Settings window
+
+`⌘,` in the launcher, Settings… in the menu, or the Soprano Cast Settings command opens it,
+laid out like Raycast's Settings. Every control writes settings.json; edits you make in the
+file show up in the window at once.
+
+- **General**: the settings.json card (its warnings, Open settings.json, Reveal in Finder),
+  Launch at login, the Soprano Cast hotkey, Show in menu bar, Theme, and your Favorites and
+  Fallback Commands in order (↑ ↓ to reorder, ✕ to remove).
+- **Extensions**: every command grouped like Raycast's table (Applications, Quicklinks,
+  Script Commands, Soprano Cast, System, Window Management) with its type, alias, hotkey
+  and Enabled box (off hides it from Root Search; its hotkey still works), and a search
+  field. Click a hotkey to record it in the same recorder as Set Hotkey… (`↵` saves now,
+  `⌫` removes, `⎋` cancels; a hotkey another command holds moves over to this one). The
+  pane on the right shows the selected command (alias, hotkey, Show in Root Search,
+  Favorite, Fallback command, and a quicklink's name, link, open-with app and icon with
+  Save and Delete Quicklink) or group: application folders, script folders, Create
+  Quicklink, and Window Management's gap and cycling.
+- **Advanced**: Show Soprano Cast on, Pop to Root Search, navigation bindings, closing when
+  another app is clicked, and the Hyper key (key, include ⇧, quick press).
 
 A bad value is ignored and keeps its default; it never stops the app. The menu shows
 "settings.json: N warnings" with every message in its tooltip, for example:
@@ -534,6 +556,7 @@ swift test
 .build/debug/SopranoCast snapshot --out /tmp/cast.png --query "chr" --keys "cmd+k" --report /tmp/cast.json
 .build/debug/SopranoCast snapshot --out /tmp/calc.png --query "2^10 / 4"
 .build/debug/SopranoCast snapshot --out /tmp/rec.png --query "chrome" --keys "shift+cmd+, return rec:cmd+1 wait" --report /tmp/rec.json
+.build/debug/SopranoCast snapshot --out /tmp/settings.png --settings-window extensions --select app:com.google.Chrome --record app:com.google.Chrome --keys "rec:cmd+2"
 ```
 
 `DEVELOPER_DIR` pins the Command Line Tools SDK, because Homebrew Swift can't read Xcode's
@@ -542,13 +565,15 @@ without hotkeys or permissions. `--keys` replays key tokens (`cmd+k`, `shift+cmd
 `key:'`, `rec:<hotkey>` to record a hotkey, `wait` to let the recorder's countdown or a
 toast timer run; time stands still otherwise); `--settings <jsonc>`, `--screen 1512x982`
 and `--theme <id>` vary the setup, and `--report` writes the query, rows, selection,
-overlay, footer toast, runs and settings edits as JSON. `snapshot` without options prints
-its full usage. The dev app (`com.soprano.cast.dev`) has its own permissions and state,
-and its command line only reaches the dev app; the bare `.build/debug/SopranoCast` reaches
-the installed app. The design system (`Sources/SopranoCast/Vendored/`) and `JSONCText`
-come from Soprano; update them with `scripts/sync-soprano-chrome.sh` instead of editing
-them here. `docs/ARCHITECTURE.md` describes the modules, and `docs/ROADMAP.md` lists what
-is not copied.
+overlay, footer toast, runs and settings edits as JSON. `--settings-window general`,
+`extensions` or `advanced` renders the settings window instead (`--select` a row or
+`group:<group>`, `--filter` its table, `--record` a hotkey with `--keys`). `snapshot`
+without options prints its full usage. The dev app (`com.soprano.cast.dev`) has its own
+permissions and state, and its command line only reaches the dev app; the bare
+`.build/debug/SopranoCast` reaches the installed app. The design system
+(`Sources/SopranoCast/Vendored/`) and `JSONCText` come from Soprano; update them with
+`scripts/sync-soprano-chrome.sh` instead of editing them here. `docs/ARCHITECTURE.md`
+describes the modules, and `docs/ROADMAP.md` lists what is not copied.
 
 ## License
 
