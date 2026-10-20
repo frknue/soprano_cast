@@ -15,6 +15,7 @@ struct ExtensionsTableTests {
             item("calculator:result", "4"),
             item("cast:quit", "Quit Soprano Cast"),
             item("system:lockScreen", "Lock Screen"),
+            item("pane:com.apple.BluetoothSettings", "Bluetooth", subtitle: "System Settings"),
             item("app:com.apple.mail", "Mail", subtitle: "/System/Applications"),
         ]
     }
@@ -26,6 +27,8 @@ struct ExtensionsTableTests {
         #expect(sections[0].rows.map(\.item.title) == ["Google Chrome", "Mail", "Slack"])
         #expect(sections.first { $0.group == .quicklinks }?.rows.isEmpty == true)
         #expect(!sections.flatMap(\.rows).contains { $0.item.id == .calculatorResult })
+        #expect(sections.first { $0.group == .system }?.rows.map(\.item.title) == ["Lock Screen"])
+        #expect(sections.first { $0.group == .systemSettings }?.rows.map(\.item.title) == ["Bluetooth"])
     }
 
     @Test("rows carry their alias, hotkey, enabled, favorite and fallback state from settings")

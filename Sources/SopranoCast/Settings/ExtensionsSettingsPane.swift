@@ -667,7 +667,7 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
                 ),
             ], to: body)
             views.append(section)
-        case .sopranoCast, .system:
+        case .sopranoCast, .system, .systemSettings:
             break
         }
         return views
@@ -680,6 +680,7 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         case .scriptCommands: "Raycast-format script commands from your script folders."
         case .sopranoCast: "Soprano Cast's own commands: these settings, reloading script folders, web search and Quit."
         case .system: "Lock, sleep, restart, shut down, log out, the Trash, ejecting, the appearance and Finder's hidden files."
+        case .systemSettings: "Every System Settings pane, found by name in Root Search; it opens straight to that pane in System Settings."
         case .windowManagement: "Move and resize the frontmost window. Needs Accessibility."
         }
     }

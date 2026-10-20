@@ -30,7 +30,7 @@ public enum ItemActions {
         switch kind {
         case .application, .script: add(.copyPath)
         case .quicklink: add(.copyLink)
-        case .systemCommand, .windowCommand, .castCommand, .calculator, nil: break
+        case .systemCommand, .windowCommand, .castCommand, .settingsPane, .calculator, nil: break
         }
         add(isApp && hasBundleID(item) ? .copyBundleID : .copyName)
         if isApp && isRunning {
@@ -56,14 +56,16 @@ public enum ItemActions {
     }
 
     /// ↵ / ⌘↵ / ⌥↵ for an item. Primary: open ("Open Application", "Open Quicklink", "Run
-    /// Script", "Run Command", calculator "Copy Answer"). Secondary: app showInFinder,
-    /// quicklink copyLink, script editScript, else nil. Tertiary: app copyPath, else nil.
+    /// Script", "Run Command", settings pane "Open System Settings", calculator "Copy
+    /// Answer"). Secondary: app showInFinder, quicklink copyLink, script editScript, else nil.
+    /// Tertiary: app copyPath, else nil.
     /// Their `shortcut` is ↵, ⌘↵ and ⌥↵.
     public static func primary(for item: CastItem) -> ItemAction {
         let title = switch item.kind {
         case .application: "Open Application"
         case .quicklink: "Open Quicklink"
         case .script: "Run Script"
+        case .settingsPane: "Open System Settings"
         case .calculator: "Copy Answer"
         case .systemCommand, .windowCommand, .castCommand, nil: "Run Command"
         }
@@ -75,7 +77,7 @@ public enum ItemActions {
         case .application: .showInFinder
         case .quicklink: .copyLink
         case .script: .editScript
-        case .systemCommand, .windowCommand, .castCommand, .calculator, nil: nil
+        case .systemCommand, .windowCommand, .castCommand, .settingsPane, .calculator, nil: nil
         }
         return id.map { action($0, shortcut: returnKey(.command)) }
     }

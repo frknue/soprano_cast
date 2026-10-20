@@ -34,8 +34,8 @@ formatter; match surrounding style.
 - Verify source changes with `swift build` and `swift test`.
 - Verify UI only with the offscreen `snapshot` subcommand and read the PNG. It builds the
   real `LauncherController` and `LauncherWindow` on fixtures (14 apps, 3 script commands,
-  fixed time, usage and history), with no Dock icon, hotkey, permission or persisted
-  state; `--report` writes query, row ids, selected id, overlay, footer toast, the
+  5 System Settings panes, fixed time, usage and history), with no Dock icon, hotkey,
+  permission or persisted state; `--report` writes query, row ids, selected id, overlay, footer toast, the
   runner's log and settings edits as JSON. `--settings-window <tab>` renders the settings
   window on the same fixtures instead. Virtual time stands still unless a `wait` token lets
   it pass, so a recorded hotkey only saves after `wait`. Usage (`SnapshotCommand.usage`):
@@ -50,9 +50,9 @@ formatter; match surrounding style.
                               [--settings <jsonc>] [--theme <id>] [--report <json>]
     --settings-window renders the settings window (1120x700) instead of the launcher;
       --select picks a row of Extensions (group:applications, group:quicklinks,
-      group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
-      an item id), --filter searches its table, --record opens the recorder card and
-      --keys replay into it.
+      group:scriptCommands, group:sopranoCast, group:system, group:systemSettings,
+      group:windowManagement or an item id), --filter searches its table, --record
+      opens the recorder card and --keys replay into it.
     --keys tokens, separated by spaces, replayed after --query:
       named keys   return enter esc escape tab space delete backspace forwardDelete
                    up down left right home end pageUp pageDown f1 … f20

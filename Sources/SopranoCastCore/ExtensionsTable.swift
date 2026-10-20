@@ -7,6 +7,7 @@ public enum ExtensionGroup: String, CaseIterable, Sendable {
     case scriptCommands
     case sopranoCast
     case system
+    case systemSettings
     case windowManagement
 
     /// The group an item kind is listed under; nil for the calculator (never stored).
@@ -17,6 +18,7 @@ public enum ExtensionGroup: String, CaseIterable, Sendable {
         case .script: self = .scriptCommands
         case .castCommand: self = .sopranoCast
         case .systemCommand: self = .system
+        case .settingsPane: self = .systemSettings
         case .windowCommand: self = .windowManagement
         case .calculator: return nil
         }
@@ -29,6 +31,7 @@ public enum ExtensionGroup: String, CaseIterable, Sendable {
         case .scriptCommands: "Script Commands"
         case .sopranoCast: "Soprano Cast"
         case .system: "System"
+        case .systemSettings: "System Settings"
         case .windowManagement: "Window Management"
         }
     }

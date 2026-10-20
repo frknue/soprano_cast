@@ -12,6 +12,9 @@ struct ItemActionsTests {
                                   icon: .glyph(.script))
     private let system = CastItem(id: ItemID(rawValue: "system:lockScreen"), title: "Lock Screen", icon: .glyph(.lock))
     private let window = CastItem(id: ItemID(rawValue: "window:leftHalf"), title: "Left Half", icon: .glyph(.window))
+    private let pane = CastItem(id: ItemID(rawValue: "pane:com.apple.BluetoothSettings"), title: "Bluetooth",
+                                subtitle: "System Settings",
+                                icon: .file(path: "/System/Library/ExtensionKit/Extensions/Bluetooth.appex"))
     private let calculator = CastItem(id: .calculatorResult, title: "4", icon: .glyph(.calculator))
 
     private func ids(_ item: CastItem, running: Bool = false, favorite: Bool = false, up: Bool = false,
@@ -62,6 +65,15 @@ struct ItemActionsTests {
         ])
         #expect(ids(system) == [.open, .copyName, .toggleFavorite, .setHotkey, .setAlias, .disableCommand])
         #expect(ids(window) == ids(system))
+    }
+
+    @Test("a System Settings pane opens System Settings and copies its name, never its bundle path")
+    func settingsPaneActions() {
+        let list = actions(pane)
+        #expect(list.map { $0.id } == [.open, .copyName, .toggleFavorite, .setHotkey, .setAlias, .disableCommand])
+        #expect(list.first?.title == "Open System Settings")
+        #expect(ItemActions.secondary(for: pane) == nil)
+        #expect(ItemActions.tertiary(for: pane) == nil)
     }
 
     @Test("the calculator row only offers its primary Copy Answer")
@@ -125,7 +137,8 @@ struct ItemActionsTests {
         #expect(ItemActions.primary(for: system).title == "Run Command")
         #expect(ItemActions.primary(for: window).title == "Run Command")
         #expect(ItemActions.primary(for: calculator).title == "Copy Answer")
-        for item in [app, quicklink, script, system, window, calculator] {
+        #expect(ItemActions.primary(for: pane).title == "Open System Settings")
+        for item in [app, quicklink, script, system, window, calculator, pane] {
             #expect(ItemActions.primary(for: item).id == .open)
             #expect(ItemActions.primary(for: item).shortcut == HotkeyCombo(modifiers: [], key: .named(.return)))
         }

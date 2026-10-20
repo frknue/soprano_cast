@@ -17,6 +17,7 @@ public enum SettingsTemplate {
     //   quicklink:<id>           "quicklink:github" (an id from "quicklinks" below)
     //   script:<absolute path>   "script:/Users/me/raycast-scripts/hello.sh"
     //   cast:<command>           "cast:searchGoogle"
+    //   pane:<bundle id>         "pane:com.apple.BluetoothSettings" (a System Settings pane)
     // Ids of apps that are not installed right now are kept.
     // System commands:
     \(wrapped(SystemCommand.allCases.map(\.rawValue)))

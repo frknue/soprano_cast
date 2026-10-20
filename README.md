@@ -4,7 +4,8 @@
 
 Soprano Cast is a copy of [Raycast](https://www.raycast.com)'s Root Search and hotkeys in
 Soprano's "Mission Control" chrome: `⌘Space` opens a search over your apps, system
-commands, window management, quicklinks and script commands, with an inline calculator.
+commands, window management, System Settings panes, quicklinks and script commands, with an
+inline calculator.
 Any of them can get a global hotkey of every kind Raycast offers (`⌘1` for Google Chrome,
 a tap of right `⌘`, a double `⇧`, a Hyper key), an alias, or a place in Favorites. It lives
 in the menu bar and has no Dock icon. Behavior follows Raycast's manual; no Raycast code is
@@ -60,10 +61,10 @@ hidden. "No results" shows when nothing matches, "Type to search apps and comman
 there is nothing to suggest.
 
 **Rows.** Each row shows its icon, title (matched letters highlighted), subtitle (an app's
-folder, a quicklink's link, "System" or "Window Management"), an alias badge, and at the
-right its type: Application, Command (system, window and Soprano Cast commands),
-Quicklink, Script Command (or the script's package name), or the calculator's expression.
-The selected row also shows its hotkey.
+folder, a quicklink's link, "System", "Window Management" or "System Settings"), an alias
+badge, and at the right its type: Application, Command (system, window, System Settings and
+Soprano Cast commands), Quicklink, Script Command (or the script's package name), or the
+calculator's expression. The selected row also shows its hotkey.
 
 **Matching and ranking.** Fuzzy, case- and accent-insensitive; several words must all
 match; consecutive letters and word starts score higher. An alias equal to the query ranks
@@ -110,7 +111,7 @@ them; later it starts fresh. `⌘⎋` clears it right away.
 | `⌃K` / `⌃J` | Previous / next row (`launcher.navigation`: `vim`, `both`) |
 | `⌥↑` / `⌥↓` | Page up / down |
 | `⌘↑` / `⌘↓` | Previous / next section |
-| `↵` | Primary action (Open Application, Open Quicklink, Run Script, Run Command, Copy Answer) |
+| `↵` | Primary action (Open Application, Open Quicklink, Run Script, Run Command, Open System Settings, Copy Answer) |
 | `⌘↵` | Secondary action (apps: Show in Finder; quicklinks: Copy Link; scripts: Edit Script) |
 | `⌥↵` | Tertiary action (apps: Copy Path) |
 | `⌘K` | Action Panel |
@@ -136,7 +137,7 @@ closes the launcher.
 
 | Action | Shortcut | For |
 |---|---|---|
-| Open Application / Open Quicklink / Run Script / Run Command / Copy Answer | `↵` (also `⌘O`) | everything |
+| Open Application / Open Quicklink / Run Script / Run Command / Open System Settings / Copy Answer | `↵` (also `⌘O`) | everything |
 | Show in Finder / Copy Link / Edit Script (the secondary action) | `⌘↵` | apps / quicklinks / scripts |
 | Show in Finder | `⇧⌘O` | scripts (apps have it as `⌘↵`) |
 | Copy Path | `⇧⌘C` | apps, scripts |
@@ -159,6 +160,9 @@ Command part: Set Hotkey…, Remove Hotkey, Set Alias…, Remove Alias.
 
 Copy Link copies the quicklink's link as written in settings.json, placeholders included.
 
+System Settings panes have Open System Settings and Copy Name besides the favorite, hotkey,
+alias and disable entries; no path, Finder or bundle id actions.
+
 **Set Alias…** opens a field prefilled with the current alias; it lowercases as you type,
 shows "Use only a–z, 0–9 and spaces" for anything else, and `↵` saves (an empty alias
 removes it).
@@ -169,10 +173,10 @@ hotkey: `↵` (the button with the command's name) confirms, `⎋` cancels.
 
 ## Hotkeys
 
-Every item (app, system command, window command, quicklink, script command, Soprano Cast
-command) can have a global hotkey. It runs the item without showing the launcher; an item
-whose required arguments are empty, or that asks for confirmation, opens the launcher on
-it instead. Window commands act on the frontmost window.
+Every item (app, system command, window command, System Settings pane, quicklink, script
+command, Soprano Cast command) can have a global hotkey. It runs the item without showing
+the launcher; an item whose required arguments are empty, or that asks for confirmation,
+opens the launcher on it instead. Window commands act on the frontmost window.
 
 | Shape | settings.json | Keycaps |
 |---|---|---|
@@ -291,6 +295,28 @@ window), Reload Script Directories (`reloadScripts`), Search Google
 (`searchGoogle`), Search DuckDuckGo (`searchDuckDuckGo`), Quit Soprano Cast (`quit`). The
 two search commands take a Query argument.
 
+## System Settings
+
+Like Raycast's System Settings extension, every System Settings pane is its own item
+(Bluetooth, Wi‑Fi, Displays, Keyboard, Battery, …), with the subtitle "System Settings".
+`↵` opens System Settings on that pane. Panes take aliases, hotkeys, favorites and can be
+disabled like any command; Settings → Extensions lists them under System Settings.
+
+- The list comes from the System Settings extensions in
+  `/System/Library/ExtensionKit/Extensions` that allow opening by URL; they open through
+  `x-apple.systempreferences:<bundle id>`. It is read once at launch.
+- A pane the extension itself hides on this Mac stays hidden: each extension declares when
+  it shows (and under which name), and Soprano Cast evaluates that for a battery, Touch ID,
+  a guest user and an optical drive (so a desktop Mac lists Energy, a laptop Battery). A
+  pane that depends on a setting (Game Controllers, Class Progress) shows only once that
+  setting is on, as in System Settings; a pane whose condition depends on other hardware
+  (a mouse, a trackpad) is listed.
+- Third-party panes (`*.prefPane` in `/Library/PreferencePanes` and
+  `~/Library/PreferencePanes`) are listed too and open as files.
+- Titles are in your preferred language; the English name is also searchable, and
+  `wi-fi` finds Wi‑Fi (whose title uses a non-breaking hyphen).
+- Panes inside a pane (Keyboard Shortcuts, Zoom, …) are not items.
+
 ## Quicklinks
 
 A quicklink opens a URL, file, folder or deeplink, filled in from arguments:
@@ -375,12 +401,12 @@ file show up in the window at once.
   Launch at login, the Soprano Cast hotkey, Show in menu bar, Theme, and your Favorites and
   Fallback Commands in order (↑ ↓ to reorder, ✕ to remove).
 - **Extensions**: every command grouped like Raycast's table (Applications, Quicklinks,
-  Script Commands, Soprano Cast, System, Window Management) with its type, alias, hotkey
-  and Enabled box (off hides it from Root Search; its hotkey still works), and a search
-  field. Click a hotkey to record it in the same recorder as Set Hotkey… (`↵` saves now,
-  `⌫` removes, `⎋` cancels; a hotkey another command holds moves over to this one). The
-  pane on the right shows the selected command (alias, hotkey, Show in Root Search,
-  Favorite, Fallback command, and a quicklink's name, link, open-with app and icon with
+  Script Commands, Soprano Cast, System, System Settings, Window Management) with its type,
+  alias, hotkey and Enabled box (off hides it from Root Search; its hotkey still works),
+  and a search field. Click a hotkey to record it in the same recorder as Set Hotkey…
+  (`↵` saves now, `⌫` removes, `⎋` cancels; a hotkey another command holds moves over to
+  this one). The pane on the right shows the selected command (alias, hotkey, Show in Root
+  Search, Favorite, Fallback command, and a quicklink's name, link, open-with app and icon with
   Save and Delete Quicklink) or group: application folders, script folders, Create
   Quicklink, and Window Management's gap and cycling.
 - **Advanced**: Show Soprano Cast on, Pop to Root Search, navigation bindings, closing when
@@ -468,6 +494,7 @@ Item ids:
 | Soprano Cast command | `cast:<id>` |
 | Quicklink | `quicklink:<id>` |
 | Script command | `script:<absolute path>` |
+| System Settings pane | `pane:<bundle id>` (e.g. `pane:com.apple.BluetoothSettings`; `pane:<path>` for a third-party `.prefPane` without one) |
 
 `SopranoCast list` prints every id. Notes:
 
@@ -538,8 +565,8 @@ CAST="/Applications/Soprano Cast.app/Contents/MacOS/SopranoCast"
   order. An item with required arguments missing (or that asks for confirmation) opens the
   launcher on it. Disabled items still run.
 - `list` prints a JSON array with `id`, `title`, `kind` (`application`, `systemCommand`,
-  `windowCommand`, `quicklink`, `script`, `castCommand`), `subtitle`, `hotkey` (as in
-  settings.json) and `alias` when set, `favorite` and `disabled`.
+  `windowCommand`, `quicklink`, `script`, `castCommand`, `settingsPane`), `subtitle`,
+  `hotkey` (as in settings.json) and `alias` when set, `favorite` and `disabled`.
 - `help` / `--help` print the usage (exit 0). Malformed arguments print the usage on stderr
   (exit 2). Errors print on stderr with exit 1: "Soprano Cast is not running.", "Soprano
   Cast did not answer.", "Unknown item id <id>; ids look like app:com.google.Chrome",

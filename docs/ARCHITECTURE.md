@@ -39,7 +39,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | `Sources/SopranoCastCore/` | Core | Pure logic, Foundation + CoreGraphics only, no AppKit, everything `public`: items, keys and hotkeys (parsing, recorder, gesture detection, conflicts), settings, search and ranking, calculator, quicklink templates, script metadata, window layout math, launcher key routing and list navigation, CLI messages. |
 | `Sources/SopranoCastCore/Vendored/JSONCText.swift` | — | Copied from Soprano by `scripts/sync-soprano-chrome.sh`. Never edit. |
 | `Sources/SopranoCast/Vendored/` | — | Soprano chrome (RetroChrome, Theme, NSColor+Hex, AppVersion, FileSystemWatcher). Never edit. |
-| `Sources/SopranoCast/System/` | System | App catalog, icons, app/quicklink/system/script execution, window manager, hotkey center + Hyper key. |
+| `Sources/SopranoCast/System/` | System | App catalog, System Settings pane catalog, icons, app/quicklink/system/script/pane execution, window manager, hotkey center + Hyper key. |
 | `Sources/SopranoCast/Launcher/` | Launcher | `LauncherController` and `LauncherWindow` (panel, search bar, list, footer, overlays, HUD). |
 | `Sources/SopranoCast/App/`, `Shell/` | Shell | `main.swift`, app delegate (composition root), menu bar, login item, settings/theme centers, app state store, permissions window, CLI. |
 | `Sources/SopranoCast/Settings/` | Settings | The settings window: tabs, panes, form chrome, recorder overlay. Reads and writes settings only through `SettingsWindowEnvironment` (`SettingsEdit`); reuses the launcher's `RecorderCardView` and `LauncherModelBuilder.recorderHint`/`conflictText`. |
@@ -66,9 +66,9 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | Core keys | `Core/KeyParsing.swift`, `Core/HotkeyParsing.swift`, `Core/HotkeyRecorder.swift`, `Core/HotkeyRecordingSession.swift`, `Core/ModifierGestureDetector.swift`, `Core/HotkeyConflicts.swift`; tests `KeyParsingTests`, `HotkeyParsingTests`, `HotkeyRecorderTests`, `HotkeyRecordingSessionTests`, `ModifierGestureDetectorTests`, `HotkeyConflictsTests` |
 | Core settings | `Core/SettingsResolver.swift`, `Core/SettingsTemplate.swift`, `Core/SettingsEditor.swift`, `Core/SettingsChanges.swift`, `Core/ExtensionsTable.swift`; tests `SettingsResolverTests`, `SettingsTemplateTests`, `SettingsEditorTests`, `ExtensionsTableTests` |
 | Core search | `Core/SearchMatcher.swift`, `Core/Ranker.swift`, `Core/Frecency.swift`, `Core/SearchHistory.swift`, `Core/Calculator.swift`; tests `SearchMatcherTests`, `RankerTests`, `FrecencyTests`, `SearchHistoryTests`, `CalculatorTests` |
-| Core commands | `Core/BuiltinItems.swift`, `Core/ItemActions.swift`, `Core/QuicklinkTemplate.swift`, `Core/ScriptMetadataParser.swift`, `Core/ScriptOutput.swift`, `Core/WindowLayout.swift`; tests `BuiltinItemsTests`, `ItemActionsTests`, `QuicklinkTemplateTests`, `ScriptMetadataParserTests`, `ScriptOutputTests`, `WindowLayoutTests` |
+| Core commands | `Core/BuiltinItems.swift`, `Core/ItemActions.swift`, `Core/QuicklinkTemplate.swift`, `Core/ScriptMetadataParser.swift`, `Core/ScriptOutput.swift`, `Core/WindowLayout.swift`, `Core/SettingsPanes.swift`; tests `BuiltinItemsTests`, `ItemActionsTests`, `QuicklinkTemplateTests`, `ScriptMetadataParserTests`, `ScriptOutputTests`, `WindowLayoutTests`, `SettingsPanesTests` |
 | Core launcher | `Core/LauncherKeyRouter.swift`, `Core/ResultNavigator.swift`; tests `LauncherKeyRouterTests`, `ResultNavigatorTests` |
-| System apps | `System/LiveAppCatalog.swift`, `System/AppActions.swift`, `System/QuicklinkOpener.swift`, `System/LiveIconProvider.swift`; tests `AppCatalogScanTests` |
+| System apps | `System/LiveAppCatalog.swift`, `System/LiveSettingsPaneCatalog.swift`, `System/AppActions.swift`, `System/QuicklinkOpener.swift`, `System/LiveIconProvider.swift`; tests `AppCatalogScanTests`, `SettingsPaneScanTests` |
 | System run | `System/SystemCommandRunner.swift`, `System/ScriptCatalog.swift`, `System/ScriptRunner.swift`, `System/LiveItemRunner.swift`; tests `ScriptRunnerTests` |
 | System windows | `System/LiveWindowManager.swift`, `System/AXWindow.swift`; tests `WindowDisplayTests` |
 | System hotkeys | `System/HotkeyCenter.swift`, `System/CarbonHotkeys.swift`, `System/ModifierTap.swift`, `System/KeyboardLayout.swift`, `System/HyperKeyController.swift`, `System/KeyEventConversion.swift`; tests `KeyboardLayoutTests`, `KeyEventConversionTests` |
@@ -353,7 +353,7 @@ extension SettingsEditor {
     public static func removingQuicklink(id: String, in text: String) throws -> String
 }
 public enum ExtensionGroup: String, CaseIterable, Sendable {
-    case applications, quicklinks, scriptCommands, sopranoCast, system, windowManagement
+    case applications, quicklinks, scriptCommands, sopranoCast, system, systemSettings, windowManagement
     public init?(kind: ItemKind)   // nil for the calculator
     public var title: String
 }
@@ -444,7 +444,7 @@ score × 1_000 + `Frecency.score` + 50 for favorites. Ties: title
 `localizedStandardCompare`, then id. `matchedAlias` set for tiers 2–3; `titleRanges` from
 the title match.
 
-### Commands (`BuiltinItems.swift`, `ItemActions.swift`, `QuicklinkTemplate.swift`, `ScriptMetadataParser.swift`, `ScriptOutput.swift`, `WindowLayout.swift`)
+### Commands (`BuiltinItems.swift`, `ItemActions.swift`, `QuicklinkTemplate.swift`, `ScriptMetadataParser.swift`, `ScriptOutput.swift`, `WindowLayout.swift`, `SettingsPanes.swift`)
 
 ```swift
 public enum BuiltinItems {
@@ -470,7 +470,8 @@ public enum ItemActions {
     /// The Configure Command submenu: setHotkey, deleteHotkey (when set), setAlias, deleteAlias (when set).
     public static func configureActions(hasHotkey: Bool, hasAlias: Bool) -> [ItemAction]
     /// ↵ / ⌘↵ / ⌥↵ for an item. Primary: open ("Open Application", "Open Quicklink", "Run
-    /// Script", "Run Command", calculator "Copy Answer"). Secondary: app showInFinder,
+    /// Script", "Run Command", settings panes "Open System Settings", calculator "Copy
+    /// Answer"). Secondary: app showInFinder,
     /// quicklink copyLink, script editScript, else nil (calculator included). Tertiary: app
     /// copyPath, else nil. Their `shortcut` is ↵, ⌘↵ and ⌥↵.
     public static func primary(for item: CastItem) -> ItemAction
@@ -482,6 +483,32 @@ public enum ItemActions {
     /// by no item: the calculator's ↵ already copies).
     public static func shortcut(for action: ItemActionID) -> HotkeyCombo?
 }
+public struct SettingsPaneFacts: Equatable, Sendable {
+    /// Known predicate keys → value, e.g. "powersource.battery", "device.touchID", "user.isguest", "device.cddvd".
+    public var values: [String: Bool]
+    public init(values: [String: Bool] = [:])
+}
+public enum SettingsPaneTarget: Equatable, Sendable {
+    case url(String)    // "x-apple.systempreferences:<key>"
+    case file(String)   // a .prefPane path, opened with NSWorkspace
+}
+public enum SettingsPanes {
+    public static let extensionPoint: String   // "com.apple.Settings.extension.ui"
+    public static let subtitle: String         // "System Settings"
+    /// One `.appex` → item. `info` = Contents/Info.plist; `infoStrings` / `localizable` = the decoded
+    /// Contents/Resources/InfoPlist.loctable / Localizable.loctable (locale code → table; [:] when absent);
+    /// `preferredLanguages` = Locale.preferredLanguages; `preference(domain, key)` reads a Bool default (nil when unset).
+    public static func extensionItem(path: String, info: [String: Any], infoStrings: [String: [String: Any]],
+                                     localizable: [String: [String: Any]], preferredLanguages: [String],
+                                     facts: SettingsPaneFacts,
+                                     preference: (_ domain: String, _ key: String) -> Bool?) -> CastItem?
+    /// One third-party `.prefPane` (from /Library/PreferencePanes, ~/Library/PreferencePanes) → item.
+    public static func legacyItem(path: String, info: [String: Any], infoStrings: [String: [String: Any]],
+                                  preferredLanguages: [String]) -> CastItem?
+    /// How to open a `.settingsPane` item: `.file(path)` when its icon path ends in ".prefPane"
+    /// (case-insensitive), else `.url("x-apple.systempreferences:" + id.key)`; nil for other kinds.
+    public static func target(for item: CastItem) -> SettingsPaneTarget?
+}
 ```
 
 Action titles: "Show in Finder", "Copy Path", "Copy Bundle Identifier", "Copy Link", "Copy
@@ -490,6 +517,45 @@ Favorites" / "Remove from Favorites", "Move Up in Favorites", "Move Down in Favo
 "Set Hotkey…", "Remove Hotkey", "Set Alias…", "Remove Alias", "Disable Command".
 Destructive (drawn in `danger`): Quit Application, Remove from Favorites, Remove Hotkey,
 Remove Alias, Disable Command.
+
+Settings pane items (`ItemKind.settingsPane`, prefix "pane", label "Command"): id
+`pane:<bundle id>` (e.g. `pane:com.apple.BluetoothSettings`; a third-party `.prefPane`
+without a bundle id is keyed by its path), subtitle `SettingsPanes.subtitle`, icon
+`.file(path)` of the bundle (`NSWorkspace.icon(forFile:)` draws the pane's own icon), no
+arguments, no confirmation. Action Panel: "Open System Settings", Copy Name and the
+generic favorite/hotkey/alias/disable entries (no path, Finder or bundle id actions).
+`SettingsPanes.extensionItem` rules:
+
+1. nil unless `EXAppExtensionAttributes.EXExtensionPointIdentifier == extensionPoint`,
+   `CFBundleIdentifier` is non-empty, and
+   `EXAppExtensionAttributes.SettingsExtensionAttributes.allowsXAppleSystemPreferencesURLScheme`
+   is true (e.g. Home's privacy pane lacks it).
+2. Representations: `SettingsExtensionAttributes.representations`, an optional array of
+   dicts with `predicate` (`"<key> == YES"` or `"<key> != YES"` only), optional `hidden`,
+   optional `sidebar-name` (a Localizable key like `BATTERY_PREF_TITLE` or literal text)
+   and optional `values_from_preferences` (`[{domain, key}]`). A predicate key's value is
+   `facts.values[key]`, else, for a key named by a `values_from_preferences` entry,
+   `preference(domain, key)` with an unset default counting as NO (as System Settings
+   does: Game Controllers and Class Progress stay hidden until their default is YES);
+   any other key is undetermined. The first representation whose predicate is definitely
+   true wins: `hidden` → nil, its `sidebar-name` (localized) is the title. None
+   definitely true → listed under the default name (fail open: Mouse and Trackpad stay
+   listed, device.mouse/trackpad are not facts).
+3. Names: the locale table is `Bundle.preferredLocalizations(from: keys, forPreferences:
+   preferredLanguages).first`, else "en", else "en_US"/"en_GB"/any "en…" key. Title =
+   representation sidebar-name (looked up in the chosen `localizable` table, else
+   literal) > `infoStrings[locale]["CFBundleDisplayName"]` >
+   `info["CFBundleDisplayName"]` > `info["CFBundleName"]`, trimmed. nil when empty or ending in "Extension"
+   ("HeadphoneSettingsExtension"). Accessibility's info name is
+   "AccessibilitySettingsExtension" but its loctable en name "Accessibility"; Bluetooth
+   has no loctable name → "Bluetooth"; PowerPreferences → "Battery" (powersource.battery
+   == YES) or "Energy"; Wi‑Fi's name contains U+2011.
+4. Keywords (deduplicated, title-equal dropped): the English name (same resolution with
+   locale "en") when it differs from the title; the title with U+2011/U+2010/U+00A0
+   replaced by "-"/"-"/" " when that differs ("wi-fi" finds "Wi‑Fi").
+5. `legacyItem`: name = localized `CFBundleDisplayName` > `NSPrefPaneIconLabel` >
+   `CFBundleName` > file name without ".prefPane"; key = `CFBundleIdentifier` or the
+   path; nil when blank.
 
 ```swift
 public struct PlaceholderContext: Sendable {
@@ -607,6 +673,7 @@ twice). Every context but the recorder: ⌘W closeWindow, ⌘Esc popToRoot.
 
 ```swift
 @MainActor final class LiveAppCatalog: ItemSource { init(extraDirectories: [String]); func setExtraDirectories(_: [String]) }
+@MainActor final class LiveSettingsPaneCatalog: ItemSource { init() }
 @MainActor final class LiveIconProvider: IconProviding { init(theme: @escaping @MainActor () -> AppTheme) }
 @MainActor enum AppActions {
     static func open(_ item: CastItem)            // app items: activate, reopen when windowless, or launch
@@ -665,8 +732,9 @@ enum KeyboardLayout {      // main thread only
 }
 ```
 
-Every `ItemSource` has `start()` / `stop()`; the app delegate starts the app catalog and
-script catalog after building the controller (the controller never starts its sources).
+Every `ItemSource` has `start()` / `stop()`; the app delegate starts the app catalog,
+settings pane catalog and script catalog after building the controller (the controller
+never starts its sources).
 
 - **Apps**: `NSMetadataQuery` for `kMDItemContentTypeTree == "com.apple.application-bundle"`
   scoped to the existing folders of /Applications, /System/Applications, ~/Applications,
@@ -685,6 +753,21 @@ script catalog after building the controller (the controller never starts its so
   no on-screen layer-0 window on the current Space,
   `NSWorkspace.openApplication(at:configuration:)` so it reopens a window (a Dock click).
   Not running → launch. (The ⌘1 → Chrome hotkey runs exactly this.)
+- **Settings panes** (`LiveSettingsPaneCatalog`): `start()` scans once off the main actor
+  (generation guard as in `LiveAppCatalog`, `onChange` only when the items differ;
+  `stop()` drops a late scan). `/System/Library/ExtensionKit/Extensions/*.appex` through
+  `SettingsPanes.extensionItem` (Info.plist, InfoPlist.loctable, Localizable.loctable,
+  `Locale.preferredLanguages`) and `*.prefPane` (case-insensitive) in
+  /Library/PreferencePanes and ~/Library/PreferencePanes through `legacyItem`;
+  deduplicated by id, sorted by title (`localizedStandardCompare`), then id. Facts: `powersource.battery` (IOKit
+  `IOPSCopyPowerSourcesInfo`, any InternalBattery source), `device.touchID`
+  (`LAContext.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics)` then
+  `biometryType == .touchID`; lockout or not enrolled still counts as the hardware),
+  `user.isguest` (`NSUserName() == "Guest"`), `device.cddvd` (any IOKit service matching
+  IOCompactDiscServices, IODVDServices or IOBDServices); `preference` =
+  `CFPreferencesCopyAppValue(key, domain) as? Bool`. Opening: `SettingsPanes.target` →
+  `NSWorkspace.open` of the `x-apple.systempreferences:<bundle id>` URL or the prefPane
+  file.
 - **Icons**: image and PDF files drawn as themselves, other files' icons from
   `NSWorkspace.icon(forFile:)`, emoji drawn into an image, glyphs from SF Symbols tinted
   with the theme accent on a `bgRaised` tile, remote icons fetched once into
@@ -729,7 +812,9 @@ script catalog after building the controller (the controller never starts its so
 - **LiveItemRunner**: application → `AppActions.open`; systemCommand →
   `SystemCommandRunner`; windowCommand → `WindowManaging.perform` (`.hud(message)` when it
   returns one, else `.done(closeLauncher: true)`); quicklink → `QuicklinkOpener`; script →
-  `ScriptRunner` (inline results also update the catalog); castCommand
+  `ScriptRunner` (inline results also update the catalog); settingsPane →
+  `SettingsPanes.target` opened with `NSWorkspace.open` (`.done(closeLauncher: true)`,
+  failure `.toast("Can't open <title>", isError: true)`); castCommand
   searchGoogle/searchDuckDuckGo → open `https://www.google.com/search?q=` /
   `https://duckduckgo.com/?q=` with the trimmed, encoded query, the rest → `castCommand`
   closure; calculator → copy the answer, `.hud("Copied")`. Copy actions write the
@@ -892,8 +977,8 @@ Controller behavior:
   action runs it.
 - Model: placeholder "Search for apps and commands…"; section headers "calculator",
   "favorites", "suggestions", "results" and `use “<query>” with…` for fallbacks; row
-  accessory = `ItemKind.label` ("Application", "Command" for system, window and Soprano
-  Cast commands, "Quicklink", "Script Command"; calculator: the expression and no
+  accessory = `ItemKind.label` ("Application", "Command" for system, window, System
+  Settings and Soprano Cast commands, "Quicklink", "Script Command"; calculator: the expression and no
   subtitle; scripts: their package name, no subtitle); fallback rows show `“<query>”` as
   the subtitle and no argument fields; alias badge; hotkey keycaps
   (`KeyboardLayout.keycaps(for:)`); footer primary title from `ItemActions.primary` (only
@@ -908,13 +993,14 @@ Controller behavior:
   the GUI with `.accessory` policy and `AppDelegate`.
 - `AppDelegate` (composition root): forces `.darkAqua`, registers the bundled font;
   single-instance guard (a second instance terminates); `SettingsCenter.shared.start()`;
-  `ThemeCenter.shared.start()`; `LiveAppCatalog`, `ScriptCatalog` (sharing the
+  `ThemeCenter.shared.start()`; `LiveAppCatalog`, `LiveSettingsPaneCatalog`, `ScriptCatalog` (sharing the
   `ScriptRunner`), `LiveIconProvider`, `LiveWindowManager`, `SystemCommandRunner`,
   `LiveItemRunner` (cast commands: openSettings → the settings window,
   reloadScripts → HUD "Reloaded script directories", quit), `HotkeyCenter`,
-  `HyperKeyController`, `LauncherWindow`, `LauncherController` with an environment over
-  `SettingsCenter`, `ThemeCenter`, `AppStateStore` (UserDefaults) and
-  `DispatchQueue.main.asyncAfter`; then starts the app and script catalogs.
+  `HyperKeyController`, `LauncherWindow`, `LauncherController` (`sources: [appCatalog,
+  scripts, settingsPanes]`) with an environment over `SettingsCenter`, `ThemeCenter`,
+  `AppStateStore` (UserDefaults) and `DispatchQueue.main.asyncAfter`; then starts the app,
+  settings pane and script catalogs.
   `hotkeys.onTrigger` → `.launcher` → `toggle()`, `.item(id)` → `runHotkey(itemID:)`.
   At start (forced) and on settings changes: the Hyper key is re-applied when
   `hyperKey` changed, and `hotkeys.setBindings(settings.hotkeyBindings, hyperKey:)` runs
@@ -1013,7 +1099,8 @@ Controller behavior:
 Git, Soprano Tab, Slack, Mail, Notes, Music, Finder, System Settings, Xcode, Aside,
 WhatsApp; Chrome, Soprano, Slack and Finder running — plus 3 script commands: "Keep Awake"
 silent, "Search Issues" compact with a required "query" argument, "Disk Usage"
-fullOutput), `FixtureIcons` (square letter tiles, glyph drawings, emoji tiles),
+fullOutput — plus 5 System Settings panes: Bluetooth, Displays, Keyboard, Sound, Wi‑Fi
+with keyword "Wi-Fi"), `FixtureIcons` (square letter tiles, glyph drawings, emoji tiles),
 `FixtureRunner` (records `run <id> "<arg>"` / `perform <action> <id>`, returns scripted
 outcomes), `FixtureHotkeys` (records "setBindings N", "suspend", "resume"). Fixed `now`
 (2026-10-19 12:00 UTC), usage (Chrome, Soprano, Slack used) and history ("slack",
@@ -1040,9 +1127,9 @@ usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"
                             [--settings <jsonc>] [--theme <id>] [--report <json>]
   --settings-window renders the settings window (1120x700) instead of the launcher;
     --select picks a row of Extensions (group:applications, group:quicklinks,
-    group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
-    an item id), --filter searches its table, --record opens the recorder card and
-    --keys replay into it.
+    group:scriptCommands, group:sopranoCast, group:system, group:systemSettings,
+    group:windowManagement or an item id), --filter searches its table, --record
+    opens the recorder card and --keys replay into it.
   --keys tokens, separated by spaces, replayed after --query:
     named keys   return enter esc escape tab space delete backspace forwardDelete
                  up down left right home end pageUp pageDown f1 … f20

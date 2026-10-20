@@ -30,7 +30,7 @@ struct FixtureCatalogTests {
         #expect(scripts.count == 3)
         #expect(scripts.allSatisfy { $0.id.key.hasPrefix("/fixtures/") })
         #expect(scripts.filter { !$0.arguments.isEmpty }.count == 1)
-        #expect(catalog.items.count == FixtureCatalog.apps.count + FixtureCatalog.scripts.count)
+        #expect(catalog.items.count == FixtureCatalog.apps.count + FixtureCatalog.scripts.count + FixtureCatalog.settingsPanes.count)
 
         let runner = FixtureRunner()
         var outcomes: [String: RunOutcome] = [:]

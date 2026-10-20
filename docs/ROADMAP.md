@@ -15,6 +15,10 @@ below, followed by what is not built yet.
 
 - Raycast `.rayconfig` import — needs a real export to build against (Raycast 1.70's
   export never wrote a file).
+- Sub-pane items like Raycast's "Keyboard Shortcuts", Accessibility "Zoom" or "Current
+  Network Details", which open anchors such as
+  `x-apple.systempreferences:com.apple.preference.keyboard?Shortcuts` — the anchors are
+  undocumented and change between macOS versions.
 
 ## Later
 

@@ -1,7 +1,7 @@
 import AppKit
 import SopranoCastCore
 
-/// The fixture apps and script commands the snapshot harness and the tests search.
+/// The fixture apps, script commands and System Settings panes the snapshot harness and the tests search.
 /// Ids, titles and folders are the real ones, so settings written against a real Mac
 /// (`hotkeys`, `aliases`, `favorites`) apply to the fixtures unchanged.
 @MainActor
@@ -88,6 +88,25 @@ final class FixtureCatalog: ItemSource {
         ),
     ]
 
+    /// System Settings panes as `LiveSettingsPaneCatalog` lists them on a real Mac.
+    static let settingsPanes: [CastItem] = [
+        pane("com.apple.BluetoothSettings", "Bluetooth", "Bluetooth.appex"),
+        pane("com.apple.Displays-Settings.extension", "Displays", "DisplaysExt.appex"),
+        pane("com.apple.Keyboard-Settings.extension", "Keyboard", "KeyboardSettings.appex"),
+        pane("com.apple.Sound-Settings.extension", "Sound", "Sound.appex"),
+        pane("com.apple.wifi-settings-extension", "Wi\u{2011}Fi", "Wi-Fi.appex", keywords: ["Wi-Fi"]),
+    ]
+
+    private static func pane(_ bundleID: String, _ title: String, _ bundle: String, keywords: [String] = []) -> CastItem {
+        CastItem(
+            id: ItemID(kind: .settingsPane, key: bundleID),
+            title: title,
+            subtitle: SettingsPanes.subtitle,
+            keywords: keywords,
+            icon: .file(path: "/System/Library/ExtensionKit/Extensions/\(bundle)")
+        )
+    }
+
     /// Apps `FixtureRunner.isRunning` reports as running (the Action Panel offers Quit/Hide).
     static let runningBundleIDs: Set<String> = [
         "com.google.Chrome", "com.soprano.app", "com.tinyspeck.slackmacgap", "com.apple.finder",
@@ -120,7 +139,7 @@ final class FixtureCatalog: ItemSource {
                 needsConfirmation: script.command.needsConfirmation
             )
         }
-        items = appItems + scriptItems
+        items = appItems + scriptItems + Self.settingsPanes
     }
 
     /// The fixture list is fixed: there is nothing to watch, so `onChange` never fires.

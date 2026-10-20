@@ -128,6 +128,19 @@ final class LiveItemRunner: ItemRunning {
             case .openSettings, .reloadScripts, .quit:
                 return castCommand(command)
             }
+        case .settingsPane:
+            let url: URL
+            switch SettingsPanes.target(for: item) {
+            case .url(let text):
+                guard let parsed = URL(string: text) else { return unknown(item) }
+                url = parsed
+            case .file(let path):
+                url = URL(fileURLWithPath: path)
+            case nil:
+                return unknown(item)
+            }
+            guard NSWorkspace.shared.open(url) else { return .toast("Can't open \(item.title)", isError: true) }
+            return .done(closeLauncher: true)
         case .calculator:
             return copy(item.title)
         case .script, nil:

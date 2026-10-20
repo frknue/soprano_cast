@@ -4,9 +4,9 @@ import SopranoCastCore
 
 private let appLog = Logger(subsystem: "com.soprano.cast", category: "app")
 
-/// The composition root: settings → theme → app and script catalogs, icons, runners →
-/// hotkeys and Hyper key → launcher window and controller → sources started → hotkey
-/// bindings → menu bar → login item → CLI server → settings and theme observers →
+/// The composition root: settings → theme → app, script and settings pane catalogs, icons,
+/// runners → hotkeys and Hyper key → launcher window and controller → sources started →
+/// hotkey bindings → menu bar → login item → CLI server → settings and theme observers →
 /// first-launch permissions.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var appCatalog: LiveAppCatalog?
     private var scripts: ScriptCatalog?
+    private var settingsPanes: LiveSettingsPaneCatalog?
     private var hotkeys: HotkeyCenter?
     private var hyperKey: HyperKeyController?
     private var controller: LauncherController?
@@ -49,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appCatalog = LiveAppCatalog(extraDirectories: settings.applicationDirectories)
         let scriptRunner = ScriptRunner()
         let scripts = ScriptCatalog(directories: settings.scriptDirectories, runner: scriptRunner)
+        let settingsPanes = LiveSettingsPaneCatalog()
         let icons = LiveIconProvider(theme: { ThemeCenter.shared.theme })
         let runner = LiveItemRunner(
             windowManager: LiveWindowManager(),
@@ -63,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hotkeys = HotkeyCenter()
         let hyperKey = HyperKeyController()
         let controller = LauncherController(
-            sources: [appCatalog, scripts],
+            sources: [appCatalog, scripts, settingsPanes],
             icons: icons,
             runner: runner,
             presenter: LauncherWindow(),
@@ -72,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.appCatalog = appCatalog
         self.scripts = scripts
+        self.settingsPanes = settingsPanes
         self.hotkeys = hotkeys
         self.hyperKey = hyperKey
         self.controller = controller
@@ -82,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The controller listens to its sources from init on, so start them only now.
         appCatalog.start()
         scripts.start()
+        settingsPanes.start()
 
         hotkeys.onTrigger = { [weak controller] target in
             switch target {
@@ -130,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hyperKey?.remove()
         appCatalog?.stop()
         scripts?.stop()
+        settingsPanes?.stop()
         SettingsCenter.shared.stop()
     }
 

@@ -13,6 +13,7 @@ import Foundation
 /// - `quicklink:<Quicklink.id>`
 /// - `script:<absolute script path>`
 /// - `cast:<CastCommand raw value>`
+/// - `pane:<bundle id>` (a System Settings pane; `pane:<absolute path>` for a `.prefPane` without an id)
 /// - `calculator:result` (the live calculator row; never stored in settings)
 public struct ItemID: RawRepresentable, Hashable, Comparable, Sendable, CustomStringConvertible {
     public let rawValue: String
@@ -51,6 +52,7 @@ public enum ItemKind: String, CaseIterable, Sendable {
     case quicklink
     case script
     case castCommand
+    case settingsPane
     case calculator
 
     public var prefix: String {
@@ -61,6 +63,7 @@ public enum ItemKind: String, CaseIterable, Sendable {
         case .quicklink: "quicklink"
         case .script: "script"
         case .castCommand: "cast"
+        case .settingsPane: "pane"
         case .calculator: "calculator"
         }
     }
@@ -79,6 +82,7 @@ public enum ItemKind: String, CaseIterable, Sendable {
         case .quicklink: "Quicklink"
         case .script: "Script Command"
         case .castCommand: "Command"
+        case .settingsPane: "Command"
         case .calculator: "Calculator"
         }
     }

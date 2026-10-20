@@ -129,9 +129,9 @@ enum SnapshotCommand {
                                 [--settings <jsonc>] [--theme <id>] [--report <json>]
       --settings-window renders the settings window (1120x700) instead of the launcher;
         --select picks a row of Extensions (group:applications, group:quicklinks,
-        group:scriptCommands, group:sopranoCast, group:system, group:windowManagement or
-        an item id), --filter searches its table, --record opens the recorder card and
-        --keys replay into it.
+        group:scriptCommands, group:sopranoCast, group:system, group:systemSettings,
+        group:windowManagement or an item id), --filter searches its table, --record
+        opens the recorder card and --keys replay into it.
       --keys tokens, separated by spaces, replayed after --query:
         named keys   return enter esc escape tab space delete backspace forwardDelete
                      up down left right home end pageUp pageDown f1 … f20
