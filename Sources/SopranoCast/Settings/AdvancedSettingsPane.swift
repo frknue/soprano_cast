@@ -72,7 +72,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
     }
 
     private func launcherCard(_ chrome: SettingsChrome, _ launcher: LauncherSettings) -> NSView {
-        let (section, body) = chrome.sectionCard(title: "launcher")
+        let (section, body) = chrome.sectionCard(title: "Launcher")
         var choices = Self.popToRootChoices
         if !choices.contains(where: { $0.0 == launcher.popToRootSeconds }) {
             choices.append((launcher.popToRootSeconds, "After \(launcher.popToRootSeconds) seconds"))
@@ -110,7 +110,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
             ),
             chrome.row(
                 label: "Close when another app is clicked",
-                control: chrome.checkbox(
+                control: chrome.switchControl(
                     isOn: launcher.closeOnFocusLoss,
                     accessibilityLabel: "Close when another app is clicked",
                     target: self,
@@ -123,7 +123,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
 
     private func hyperKeyCard(_ chrome: SettingsChrome, _ hyperKey: HyperKeySettings) -> NSView {
         let (section, body) = chrome.sectionCard(
-            title: "hyper key",
+            title: "Hyper key",
             subtitle: "Turns one key into ⌃⌥⇧⌘ (✦) for hotkeys. Needs Accessibility."
         )
         let quickPress = chrome.popup(
@@ -145,7 +145,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
             ),
             chrome.row(
                 label: "Include ⇧ in ✦",
-                control: chrome.checkbox(
+                control: chrome.switchControl(
                     isOn: hyperKey.includeShift,
                     accessibilityLabel: "Include Shift in the Hyper key",
                     target: self,
@@ -179,7 +179,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
         host?.apply([.set(Self.navigations[sender.indexOfSelectedItem].0.rawValue, ["launcher", "navigation"])])
     }
 
-    @objc private func closeOnFocusLossChanged(_ sender: NSButton) {
+    @objc private func closeOnFocusLossChanged(_ sender: ChromeSwitch) {
         host?.apply([.set(sender.state == .on, ["launcher", "closeOnFocusLoss"])])
     }
 
@@ -200,7 +200,7 @@ final class AdvancedSettingsPane: NSView, SettingsPane {
         host.apply(edits)
     }
 
-    @objc private func includeShiftChanged(_ sender: NSButton) {
+    @objc private func includeShiftChanged(_ sender: ChromeSwitch) {
         host?.apply([.set(sender.state == .on, ["hyperKey", "includeShift"])])
     }
 

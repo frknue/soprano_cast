@@ -251,7 +251,7 @@ final class LauncherHarness {
                 try LauncherHarness.apply(edit, to: &state.settings, log: &state.edits)
                 state.controller?.settingsDidChange()
             },
-            theme: { AppTheme.missionControl },
+            theme: { AppTheme.folioPaper },
             now: { state.now },
             schedule: { milliseconds, work in scheduler.schedule(milliseconds, work) },
             screenFrame: { _ in LauncherHarness.screenFrame },

@@ -66,4 +66,12 @@ struct HotkeyRecordingSessionTests {
         #expect(session.handle(plain(0x35)) { _ in nil } == .close)
         #expect(session.handle(plain(0x24)) { _ in nil } == .close)
     }
+
+    @Test("the shown keys become K1 caps: a spec through the given caps, held modifiers as one chord")
+    func keysAsCaps() {
+        let layout: (HotkeySpec) -> [String] = { _ in ["⌘2"] }
+        #expect(HotkeyRecordingSession.Keys.spec(commandTwo).caps(layout) == ["⌘2"])
+        #expect(HotkeyRecordingSession.Keys.display(["⇧", "L⌘"]).caps(layout) == ["⇧ L⌘"])
+        #expect(HotkeyRecordingSession.Keys.display([]).caps(layout) == [])
+    }
 }

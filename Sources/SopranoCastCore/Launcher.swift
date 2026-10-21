@@ -9,13 +9,14 @@ public enum SectionKind: String, CaseIterable, Sendable {
     case results
     case fallbacks
 
+    /// Sentence case; the section heading's eyebrow sets it in capitals.
     public var title: String {
         switch self {
-        case .calculator: "calculator"
-        case .favorites: "favorites"
-        case .suggestions: "suggestions"
-        case .results: "results"
-        case .fallbacks: "use with"
+        case .calculator: "Calculator"
+        case .favorites: "Favorites"
+        case .suggestions: "Suggestions"
+        case .results: "Results"
+        case .fallbacks: "Use with"
         }
     }
 }

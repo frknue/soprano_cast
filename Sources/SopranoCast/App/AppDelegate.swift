@@ -31,17 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyFailures: [HotkeyFailure] = []
     private var hyperKeyError: String?
 
-    func applicationWillFinishLaunching(_ notification: Notification) {
-        NSApp.appearance = NSAppearance(named: .darkAqua)
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !Self.anotherInstanceIsRunning() else {
             NSApp.terminate(nil)
             return
         }
-        _ = RetroFont.registerBundledFont()
-
         let settingsCenter = SettingsCenter.shared
         settingsCenter.start()
         ThemeCenter.shared.start()

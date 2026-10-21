@@ -1,9 +1,10 @@
 import AppKit
 import SopranoCastCore
 
-/// The HUD: a short message ("Copied", "Left Half") in a borderless panel centered 1/6 up
-/// from the bottom of the display, `bgRaised` with a `borderStrong` hairline and display-11
-/// text. It fades out after 1.5 s; a newer message replaces it and restarts the clock.
+/// The HUD (Folio `.hud`): a short message ("Copied", "Left Half") in a borderless panel
+/// centered 1/6 up from the bottom of the display: `raised`, a `borderSubtle` hairline,
+/// radius 10, the e2 shadow and SF 13 text. It fades out after 1.5 s (at once under
+/// Reduce Motion); a newer message replaces it and restarts the clock.
 @MainActor
 final class HUDWindow {
     static let visibleDuration: TimeInterval = 1.5
@@ -20,6 +21,7 @@ final class HUDWindow {
     private let view = HUDView()
     /// Bumped on every show so a stale timer or fade completion does nothing.
     private var generation = 0
+    private var shadow = AppTheme.folioPaper.colors.shadowE2
 
     init() {
         panel = NSPanel(
@@ -38,20 +40,21 @@ final class HUDWindow {
         panel.hasShadow = true
         panel.ignoresMouseEvents = true
         panel.animationBehavior = .none
-        panel.appearance = NSAppearance(named: .darkAqua)
         panel.contentView = view
     }
 
     /// Shows `text` on the display whose AppKit visible frame is `screenFrame`; `onScreen`
     /// false keeps the panel laid out but never ordered in (snapshots, tests).
-    func show(_ text: String, screenFrame: CGRect, colors: ThemeColors, onScreen: Bool) {
+    func show(_ text: String, screenFrame: CGRect, theme: AppTheme, onScreen: Bool) {
         generation += 1
         let shown = generation
         self.text = text
         isShowing = true
+        shadow = theme.colors.shadowE2
+        panel.appearance = theme.appearance.nsAppearance
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        view.configure(text: text, colors: colors)
+        view.configure(text: text, colors: theme.colors)
         let width = view.preferredWidth
         frame = CGRect(
             x: (screenFrame.midX - width / 2).rounded(),
@@ -84,7 +87,8 @@ final class HUDWindow {
         guard isShowing else { return }
         view.renderLayerTree(
             in: context,
-            at: CGPoint(x: frame.minX - screenFrame.minX, y: frame.minY - screenFrame.minY)
+            at: CGPoint(x: frame.minX - screenFrame.minX, y: frame.minY - screenFrame.minY),
+            shadow: shadow
         )
     }
 
@@ -93,7 +97,7 @@ final class HUDWindow {
         isShowing = false
         guard panel.isVisible else { return }
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = Self.fadeDuration
+            context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : Self.fadeDuration
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             // AppKit runs animation completions on the main thread.
@@ -108,9 +112,9 @@ final class HUDWindow {
     }
 }
 
-/// The HUD's content: the message centered in the display face.
+/// The HUD's content: the message centered in SF 13.
 final class HUDView: LauncherFlippedView {
-    static let horizontalPadding: CGFloat = 18
+    static let horizontalPadding: CGFloat = 16
     static let minimumWidth: CGFloat = 120
 
     private let label = LauncherText.label()
@@ -129,11 +133,11 @@ final class HUDView: LauncherFlippedView {
     }
 
     func configure(text: String, colors: ThemeColors) {
-        layer?.backgroundColor = colors.bgRaised.cgColor
-        layer?.borderColor = colors.borderStrong.cgColor
-        layer?.borderWidth = Retro.hairline
-        layer?.cornerRadius = Retro.cornerRadius
-        label.attributedStringValue = RetroText.display(text, color: colors.textPrimary, alignment: .center)
+        layer?.backgroundColor = colors.raised.cgColor
+        layer?.borderColor = colors.borderSubtle.cgColor
+        layer?.borderWidth = Chrome.hairline
+        layer?.cornerRadius = Chrome.Radius.popover
+        label.attributedStringValue = LauncherText.plain(text, font: ChromeFont.row, color: colors.textPrimary, alignment: .center)
         preferredWidth = max(Self.minimumWidth, LauncherText.width(of: label.attributedStringValue) + Self.horizontalPadding * 2)
         setAccessibilityLabel(text)
     }
@@ -143,7 +147,7 @@ final class HUDView: LauncherFlippedView {
             minX: Self.horizontalPadding,
             maxX: bounds.width - Self.horizontalPadding,
             centerY: bounds.height / 2,
-            font: RetroFont.display(11)
+            font: ChromeFont.row
         )
     }
 }

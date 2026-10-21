@@ -1,12 +1,11 @@
 import AppKit
 import SopranoCastCore
 
-/// The search bar: the query field (body 18) with the selected item's argument fields
+/// The search bar: the query field (SF Pro 20) with the selected item's argument fields
 /// inline after its text, and a `borderSubtle` hairline below. User edits report the whole
 /// text through `onQueryChange` / `onArgumentChange`; model updates never echo back.
 final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
-    static let horizontalInset: CGFloat = 16
-    static let queryFontSize: CGFloat = 18
+    static let horizontalInset: CGFloat = 20
     /// Space between the query text and the first argument field.
     static let queryArgumentGap: CGFloat = 12
     static let argumentGap: CGFloat = 8
@@ -18,13 +17,13 @@ final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
     var onQueryChange: ((String) -> Void)?
     var onArgumentChange: ((Int, String) -> Void)?
 
-    private let rule = RetroRuleView(axis: .horizontal, style: .single)
-    private var colors = AppTheme.missionControl.colors
+    private let rule = LauncherFlippedView()
+    private var colors = AppTheme.folioPaper.colors
     private var placeholder = ""
 
     init() {
         super.init(frame: .zero)
-        queryField.font = RetroFont.body(Self.queryFontSize)
+        queryField.font = ChromeFont.query
         queryField.delegate = self
         queryField.setAccessibilityLabel("Search")
         rule.translatesAutoresizingMaskIntoConstraints = true
@@ -42,20 +41,19 @@ final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
         placeholder: String,
         arguments: [ArgumentFieldViewModel],
         focus: LauncherFocus,
-        colors: ThemeColors
+        theme: AppTheme
     ) {
+        let colors = theme.colors
         self.colors = colors
         self.placeholder = placeholder
         queryField.textColor = colors.textPrimary
-        queryField.placeholderAttributedString = LauncherText.plain(
-            placeholder, font: RetroFont.body(Self.queryFontSize), color: colors.textMuted
-        )
+        queryField.placeholderAttributedString = LauncherText.plain(placeholder, font: ChromeFont.query, color: colors.textMuted)
         LauncherText.sync(queryField, to: query)
         ensureBoxes(for: arguments)
         for (index, box) in argumentBoxes.enumerated() {
-            box.configure(arguments[index], focused: focus == .argument(index), colors: colors)
+            box.configure(arguments[index], focused: focus == .argument(index), theme: theme)
         }
-        rule.color = colors.borderSubtle
+        rule.layer?.backgroundColor = colors.borderSubtle.cgColor
         layoutContents()
     }
 
@@ -85,9 +83,9 @@ final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
     /// Without arguments the query field spans the bar; with them it is as wide as its text
     /// (or placeholder) so the argument fields sit right after it, like Raycast's.
     func layoutContents() {
-        let bandHeight = bounds.height - Retro.hairline
+        let bandHeight = bounds.height - Chrome.hairline
         let centerY = bandHeight / 2
-        let font = RetroFont.body(Self.queryFontSize)
+        let font = ChromeFont.query
         let fieldHeight = LauncherText.lineHeight(font) + 2
         let maxX = bounds.width - Self.horizontalInset
         var queryWidth = max(0, maxX - Self.horizontalInset)
@@ -117,7 +115,7 @@ final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
             box.layoutContents()
             x += ArgumentBoxView.width + Self.argumentGap
         }
-        rule.frame = CGRect(x: 0, y: bounds.height - Retro.hairline, width: bounds.width, height: Retro.hairline)
+        rule.frame = CGRect(x: 0, y: bounds.height - Chrome.hairline, width: bounds.width, height: Chrome.hairline)
     }
 
     // MARK: - NSTextFieldDelegate
@@ -137,13 +135,14 @@ final class SearchBarView: LauncherFlippedView, NSTextFieldDelegate {
 
 // MARK: - Argument field
 
-/// One argument: a bordered `bgRaised` box (framed in `accent` while focused) holding a
-/// body-14 text field, a secure field, or a pop-up menu for a dropdown.
+/// One argument: a Folio `.field` box (`raised`, `borderStrong` edge, radius 6; the edge
+/// darkens to `fieldFocusEdge` while focused, never accent) holding an SF 13 text field, a
+/// secure field, or a pop-up menu for a dropdown.
 final class ArgumentBoxView: LauncherFlippedView, NSTextFieldDelegate {
     static let width: CGFloat = 150
-    static let height: CGFloat = 30
+    static let height: CGFloat = Chrome.fieldHeight
     static let horizontalInset: CGFloat = 8
-    static let fontSize: CGFloat = 14
+    static let font = ChromeFont.row
 
     enum Kind: Equatable {
         case text
@@ -170,14 +169,14 @@ final class ArgumentBoxView: LauncherFlippedView, NSTextFieldDelegate {
     private var options: [String] = []
     private var placeholder = ""
     private var isOptional = false
-    private var colors = AppTheme.missionControl.colors
+    private var colors = AppTheme.folioPaper.colors
 
     init(kind: Kind) {
         self.kind = kind
         switch kind {
         case .text, .secure:
             let field = LauncherText.inputField(secure: kind == .secure)
-            field.font = RetroFont.body(Self.fontSize)
+            field.font = Self.font
             control = field
         case .dropdown:
             control = ArgumentPopUpButton()
@@ -197,25 +196,25 @@ final class ArgumentBoxView: LauncherFlippedView, NSTextFieldDelegate {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(_ argument: ArgumentFieldViewModel, focused: Bool, colors: ThemeColors) {
+    func configure(_ argument: ArgumentFieldViewModel, focused: Bool, theme: AppTheme) {
+        let colors = theme.colors
         self.colors = colors
-        layer?.backgroundColor = colors.bgRaised.cgColor
-        layer?.borderColor = (focused ? colors.accent : colors.borderSubtle).cgColor
-        layer?.borderWidth = Retro.hairline
-        layer?.cornerRadius = Retro.cornerRadius
+        layer?.backgroundColor = colors.raised.cgColor
+        layer?.borderColor = (focused ? colors.fieldFocusEdge : colors.borderStrong).cgColor
+        layer?.borderWidth = Chrome.hairline
+        layer?.cornerRadius = Chrome.Radius.control
         control.setAccessibilityLabel(argument.placeholder)
         // Optional arguments read quieter, as in Raycast.
         let placeholderColor = argument.isOptional ? colors.textMuted.withAlphaComponent(0.6) : colors.textMuted
         if let field = control as? NSTextField {
             field.textColor = colors.textPrimary
-            field.placeholderAttributedString = LauncherText.plain(
-                argument.placeholder, font: RetroFont.body(Self.fontSize), color: placeholderColor
-            )
+            field.placeholderAttributedString = LauncherText.plain(argument.placeholder, font: Self.font, color: placeholderColor)
             LauncherText.sync(field, to: argument.value)
             if focused {
-                (field.currentEditor() as? NSTextView)?.insertionPointColor = colors.accent
+                ChromeFieldView.styleEditor(of: field, colors: colors)
             }
         } else if let popUp = control as? NSPopUpButton {
+            popUp.menu?.appearance = theme.appearance.nsAppearance
             configurePopUp(popUp, argument: argument, placeholderColor: placeholderColor)
         }
     }
@@ -224,7 +223,7 @@ final class ArgumentBoxView: LauncherFlippedView, NSTextFieldDelegate {
     /// the menu only for an optional argument (picking it clears the value).
     private func configurePopUp(_ popUp: NSPopUpButton, argument: ArgumentFieldViewModel, placeholderColor: NSColor) {
         let options = argument.options ?? []
-        let font = RetroFont.body(Self.fontSize)
+        let font = Self.font
         if options != self.options || argument.placeholder != placeholder || argument.isOptional != isOptional {
             self.options = options
             placeholder = argument.placeholder
@@ -249,7 +248,7 @@ final class ArgumentBoxView: LauncherFlippedView, NSTextFieldDelegate {
 
     func layoutContents() {
         if control is NSTextField {
-            let height = LauncherText.lineHeight(RetroFont.body(Self.fontSize)) + 2
+            let height = LauncherText.lineHeight(Self.font) + 2
             control.frame = CGRect(
                 x: Self.horizontalInset,
                 y: ((bounds.height - height) / 2).rounded(),
@@ -289,8 +288,7 @@ final class ArgumentPopUpButton: NSPopUpButton {
         super.init(frame: .zero, pullsDown: false)
         translatesAutoresizingMaskIntoConstraints = true
         isBordered = false
-        font = RetroFont.body(ArgumentBoxView.fontSize)
-        menu?.appearance = NSAppearance(named: .darkAqua)
+        font = ArgumentBoxView.font
     }
 
     @available(*, unavailable)

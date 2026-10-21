@@ -52,4 +52,11 @@ struct KeyboardLayoutTests {
         let spec = HotkeySpec.doubleTap(SidedModifier(.command))
         #expect(KeyboardLayout.keycaps(for: spec) == spec.keycaps)
     }
+
+    @Test("K1 caps join the layout's keycaps into one chord cap")
+    func layoutCaps() {
+        let spec = HotkeySpec.combo(HotkeyCombo(modifiers: [.shift, .command], key: .physical(0x12)))
+        #expect(KeyboardLayout.caps(for: spec) == ["⇧⌘1"])
+        #expect(KeyboardLayout.caps(for: .doubleTap(SidedModifier(.command))) == ["⌘", "⌘"])
+    }
 }

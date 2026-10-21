@@ -15,6 +15,15 @@ public struct HotkeyRecordingSession: Sendable {
         case spec(HotkeySpec)
         /// The recorder's own keycaps while modifiers are held.
         case display([String])
+
+        /// The K1 caps to draw: a spec through `caps` (the layout's), held modifiers as one
+        /// chord ("⇧⌘", "L⌘ R⌘"); empty while nothing is held.
+        public func caps(_ caps: (HotkeySpec) -> [String]) -> [String] {
+            switch self {
+            case .spec(let spec): caps(spec)
+            case .display(let held): held.isEmpty ? [] : [Keycaps.chord(modifiers: held)]
+            }
+        }
     }
 
     /// What the host does after an event.

@@ -1,34 +1,37 @@
 import AppKit
 import SopranoCastCore
 
-/// The 40 pt footer on `bgPanel` with a hairline on top. Left: a small stripe and
-/// "soprano cast", or a toast (body 12; `danger` for an error) in their place. Right: the
-/// primary action's title with its ↵ keycap, a separator, and "actions" with ⌘ K.
+/// The 40 pt footer on the panel's surface with a `borderSubtle` hairline on top. Left:
+/// the Cast glyph and "Soprano Cast" (SF 12 muted), or a toast (`danger` for an error) in
+/// their place. Right: the primary action's title (ink) with its ↵ cap, a separator, and
+/// "Actions" with one ⌘K cap.
 final class FooterView: LauncherFlippedView {
-    static let horizontalInset: CGFloat = 16
-    static let stripeSize = CGSize(width: 26, height: 10)
-    static let keycapHeight: CGFloat = 20
-    static let brand = "soprano cast"
+    static let leadingInset: CGFloat = 20
+    static let trailingInset: CGFloat = 12
+    static let glyphSide: CGFloat = 14
+    static let keycapHeight: CGFloat = Chrome.keycapHeight
+    static let brand = "Soprano Cast"
 
-    private let rule = RetroRuleView(axis: .horizontal, style: .single)
-    private let stripe = RetroStripeView(layout: .slanted)
+    private let rule = LauncherFlippedView()
+    private let glyphLayer = CALayer()
     private let brandLabel = LauncherText.label()
     private let toastLabel = LauncherText.label()
     private let primaryLabel = LauncherText.label()
     private let primaryKeys = KeycapRowView()
-    private let separator = RetroRuleView(axis: .vertical, style: .single)
+    private let separator = LauncherFlippedView()
     private let actionsLabel = LauncherText.label()
     private let actionsKeys = KeycapRowView()
+    private var glyphColor: NSColor?
 
     /// The toast showing, nil when the brand shows.
     private(set) var toastText: String?
 
     init() {
         super.init(frame: .zero)
-        for view: NSView in [rule, stripe, separator] {
-            view.translatesAutoresizingMaskIntoConstraints = true
-        }
-        for view: NSView in [rule, stripe, brandLabel, toastLabel, primaryLabel, primaryKeys, separator, actionsLabel, actionsKeys] {
+        glyphLayer.contentsGravity = .resizeAspect
+        glyphLayer.contentsScale = 2
+        layer?.addSublayer(glyphLayer)
+        for view: NSView in [rule, brandLabel, toastLabel, primaryLabel, primaryKeys, separator, actionsLabel, actionsKeys] {
             addSubview(view)
         }
     }
@@ -38,76 +41,80 @@ final class FooterView: LauncherFlippedView {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(_ footer: FooterViewModel, colors: ThemeColors) {
-        layer?.backgroundColor = colors.bgPanel.cgColor
-        rule.color = colors.borderSubtle
-        separator.color = colors.borderSubtle
-        stripe.colors = colors.stripe
+    func configure(_ footer: FooterViewModel, theme: AppTheme) {
+        let colors = theme.colors
+        rule.layer?.backgroundColor = colors.borderSubtle.cgColor
+        separator.layer?.backgroundColor = colors.borderSubtle.cgColor
+        if glyphColor != colors.textMuted {
+            glyphColor = colors.textMuted
+            let glyph = CastGlyph.image(side: Self.glyphSide, lineWidth: 1.4, color: colors.textMuted)
+            glyphLayer.contents = LauncherText.cgImage(glyph, side: Self.glyphSide, scale: glyphLayer.contentsScale)
+        }
         toastText = footer.toast
-        brandLabel.attributedStringValue = RetroText.display(Self.brand, color: colors.textMuted)
+        brandLabel.attributedStringValue = LauncherText.plain(Self.brand, font: ChromeFont.label, color: colors.textMuted)
         toastLabel.attributedStringValue = LauncherText.plain(
-            footer.toast ?? "", font: RetroFont.body(12), color: footer.toastIsError ? colors.danger : colors.textPrimary
+            footer.toast ?? "", font: ChromeFont.label, color: footer.toastIsError ? colors.danger : colors.textPrimary
         )
         primaryLabel.attributedStringValue = LauncherText.plain(
-            footer.primaryTitle ?? "", font: RetroFont.body(12), color: colors.textPrimary, alignment: .right
+            footer.primaryTitle ?? "", font: ChromeFont.label, color: colors.textPrimary, alignment: .right
         )
-        primaryKeys.configure(keys: ["↵"], fontSize: RetroFont.grid, height: Self.keycapHeight, colors: colors)
-        actionsLabel.attributedStringValue = RetroText.display("actions", color: colors.textMuted, alignment: .right)
-        actionsKeys.configure(keys: ["⌘", "K"], fontSize: RetroFont.grid, height: Self.keycapHeight, colors: colors)
+        primaryKeys.configure(keys: ["↵"], colors: colors)
+        actionsLabel.attributedStringValue = LauncherText.plain("Actions", font: ChromeFont.label, color: colors.textMuted, alignment: .right)
+        actionsKeys.configure(keys: ["⌘K"], colors: colors)
         layoutContents(showsPrimary: footer.primaryTitle != nil, showsActions: footer.showsActions)
     }
 
     private func layoutContents(showsPrimary: Bool, showsActions: Bool) {
-        let centerY = (Retro.hairline + bounds.height) / 2
-        rule.frame = CGRect(x: 0, y: 0, width: bounds.width, height: Retro.hairline)
+        let centerY = ((Chrome.hairline + bounds.height) / 2).rounded()
+        rule.frame = CGRect(x: 0, y: 0, width: bounds.width, height: Chrome.hairline)
 
         // Right side, laid out from the trailing edge.
-        var trailing = bounds.width - Self.horizontalInset
+        var trailing = bounds.width - Self.trailingInset
         actionsKeys.isHidden = !showsActions
         actionsLabel.isHidden = !showsActions
         if showsActions {
-            trailing = placeKeys(actionsKeys, trailing: trailing, centerY: centerY) - 6
+            trailing = placeKeys(actionsKeys, trailing: trailing, centerY: centerY) - 8
             let width = LauncherText.width(of: actionsLabel.attributedStringValue)
-            actionsLabel.frame = LauncherText.lineFrame(minX: trailing - width, maxX: trailing, centerY: centerY, font: RetroFont.display(11))
+            actionsLabel.frame = LauncherText.lineFrame(minX: trailing - width, maxX: trailing, centerY: centerY, font: ChromeFont.label)
             trailing -= width
         }
         let separated = showsPrimary && showsActions
         separator.isHidden = !separated
         if separated {
-            trailing -= 12
-            separator.frame = CGRect(x: trailing - Retro.hairline, y: (centerY - 8).rounded(), width: Retro.hairline, height: 16)
-            trailing -= Retro.hairline + 12
+            trailing -= 14
+            separator.frame = CGRect(x: trailing - Chrome.hairline, y: centerY - 8, width: Chrome.hairline, height: 16)
+            trailing -= Chrome.hairline + 14
         }
         primaryKeys.isHidden = !showsPrimary
         primaryLabel.isHidden = !showsPrimary
         let leftLimit = bounds.width / 2
         if showsPrimary {
-            trailing = placeKeys(primaryKeys, trailing: trailing, centerY: centerY) - 6
+            trailing = placeKeys(primaryKeys, trailing: trailing, centerY: centerY) - 8
             let width = min(LauncherText.width(of: primaryLabel.attributedStringValue), max(0, trailing - leftLimit))
-            primaryLabel.frame = LauncherText.lineFrame(minX: trailing - width, maxX: trailing, centerY: centerY, font: RetroFont.body(12))
+            primaryLabel.frame = LauncherText.lineFrame(minX: trailing - width, maxX: trailing, centerY: centerY, font: ChromeFont.label)
             trailing -= width
         }
 
-        // Left side: the toast replaces the stripe and the brand.
-        let leftMax = max(Self.horizontalInset, trailing - 16)
+        // Left side: the toast replaces the glyph and the brand.
+        let leftMax = max(Self.leadingInset, trailing - 16)
         let showsToast = toastText != nil
         toastLabel.isHidden = !showsToast
-        stripe.isHidden = showsToast
+        glyphLayer.isHidden = showsToast
         brandLabel.isHidden = showsToast
         if showsToast {
             toastLabel.frame = LauncherText.lineFrame(
-                minX: Self.horizontalInset, maxX: leftMax, centerY: centerY, font: RetroFont.body(12)
+                minX: Self.leadingInset, maxX: leftMax, centerY: centerY, font: ChromeFont.label
             )
         } else {
-            stripe.frame = CGRect(
-                x: Self.horizontalInset,
-                y: (centerY - Self.stripeSize.height / 2).rounded(),
-                width: Self.stripeSize.width,
-                height: Self.stripeSize.height
+            glyphLayer.frame = CGRect(
+                x: Self.leadingInset,
+                y: centerY - Self.glyphSide / 2,
+                width: Self.glyphSide,
+                height: Self.glyphSide
             )
-            let brandX = stripe.frame.maxX + 8
+            let brandX = glyphLayer.frame.maxX + 8
             let width = min(LauncherText.width(of: brandLabel.attributedStringValue), max(0, leftMax - brandX))
-            brandLabel.frame = LauncherText.lineFrame(minX: brandX, maxX: brandX + width, centerY: centerY, font: RetroFont.display(11))
+            brandLabel.frame = LauncherText.lineFrame(minX: brandX, maxX: brandX + width, centerY: centerY, font: ChromeFont.label)
         }
     }
 

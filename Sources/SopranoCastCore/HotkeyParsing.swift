@@ -1,6 +1,30 @@
 import Foundation
 
-// settings.json spellings and keycaps for hotkeys (HotkeySpec and its parts in Keys.swift).
+// settings.json spellings, keycaps and K1 caps for hotkeys (HotkeySpec and its parts in
+// Keys.swift).
+
+/// Keycap rule K1: one cap per chord step. Everything held together (modifiers and the key)
+/// shares one cap ("⇧⌘K", "✦1", "L⌘ R⌘"); a sequence (a double tap) is one cap per step.
+public enum Keycaps {
+    /// One chord step as a single cap legend: the modifiers in the order given, then the key.
+    /// A multi-character modifier ("fn", "L⌘") is set off by spaces so it stays readable:
+    /// ["⇧", "⌘"] + "K" → "⇧⌘K", ["fn"] + "A" → "fn A", ["⌥", "R⌘"] → "⌥ R⌘".
+    public static func chord(modifiers: [String], key: String? = nil) -> String {
+        var legend = ""
+        var previousIsWide = false
+        for modifier in modifiers {
+            let isWide = modifier.count > 1
+            if !legend.isEmpty, isWide || previousIsWide { legend += " " }
+            legend += modifier
+            previousIsWide = isWide
+        }
+        if let key {
+            if previousIsWide { legend += " " }
+            legend += key
+        }
+        return legend
+    }
+}
 
 extension SidedModifier {
     /// A modifier name ("cmd", "option", "⌥", …) or a sided one: "l"/"r" + a spelled-out
@@ -154,5 +178,25 @@ extension HotkeySpec {
     /// Shape names for messages: "⇧⌘K".
     public var displayString: String {
         keycaps.joined()
+    }
+
+    /// The K1 caps: one cap for a combo, a modifier tap or both sides ("⇧⌘K", "R⌘",
+    /// "L⌘ R⌘"), two for a double tap ("⌘", "⌘").
+    public var caps: [String] {
+        caps(fromKeycaps: keycaps)
+    }
+
+    /// The K1 caps of `keycaps` laid out like `self.keycaps` (the key last for a combo),
+    /// e.g. with the key shown as it types on the current layout.
+    public func caps(fromKeycaps parts: [String]) -> [String] {
+        guard !parts.isEmpty else { return [] }
+        switch self {
+        case .combo:
+            return [Keycaps.chord(modifiers: Array(parts.dropLast()), key: parts.last)]
+        case .modifierTap, .bothSides:
+            return [Keycaps.chord(modifiers: parts)]
+        case .doubleTap:
+            return parts
+        }
     }
 }

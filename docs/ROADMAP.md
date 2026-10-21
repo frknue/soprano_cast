@@ -9,7 +9,7 @@ below, followed by what is not built yet.
 - The Raycast account.
 - AI.
 - The extension Store.
-- Raycast themes: Soprano themes, all dark.
+- Raycast themes: Soprano's themes instead (Folio Paper / Ink and seven dark themes).
 
 ## Not built yet
 

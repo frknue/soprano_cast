@@ -281,7 +281,6 @@ enum SnapshotCommand {
         let app = NSApplication.shared
         // No Dock icon, no menu bar, never activated: nothing appears on the user's screen.
         app.setActivationPolicy(.prohibited)
-        app.appearance = NSAppearance(named: .darkAqua)
         do {
             let result = try render(options)
             try writePNG(result.image, to: options.out)
@@ -300,8 +299,9 @@ enum SnapshotCommand {
     /// The testable core: the rendered image (screen size × 2, or the settings window × 2)
     /// and the report.
     static func render(_ options: Options) throws -> (image: CGImage, report: SnapshotReport) {
-        _ = RetroFont.registerBundledFont()
         let store = try settingsStore(options)
+        // Menus, pop-ups and scrollers draw in the fixture theme's appearance.
+        NSApplication.shared.appearance = FixtureTheme.resolve(store.settings.theme).appearance.nsAppearance
         if let tab = options.settingsWindow {
             return try renderSettingsWindow(options, tab: tab, store: store)
         }
@@ -314,7 +314,7 @@ enum SnapshotCommand {
         let presenter = ModelRecordingPresenter(LauncherWindow())
         let controller = LauncherController(
             sources: [FixtureCatalog()],
-            icons: FixtureIcons(),
+            icons: FixtureIcons(theme: support.environment.theme),
             runner: runner,
             presenter: presenter,
             hotkeys: FixtureHotkeys(),
@@ -343,7 +343,8 @@ enum SnapshotCommand {
             }
         }
 
-        guard let backdrop = backdrop(size: options.screenSize, scale: 2) else {
+        let appearance = FixtureTheme.resolve(store.settings.theme).appearance
+        guard let backdrop = backdrop(size: options.screenSize, scale: 2, appearance: appearance) else {
             throw FixtureError(description: "the backdrop did not render")
         }
         let image = presenter.renderSnapshot(screenFrame: screen, scale: 2, backdrop: backdrop) ?? backdrop
@@ -373,7 +374,7 @@ enum SnapshotCommand {
         LauncherWindow.offscreen = true
         let controller = LauncherController(
             sources: [FixtureCatalog()],
-            icons: FixtureIcons(),
+            icons: FixtureIcons(theme: support.environment.theme),
             runner: FixtureRunner(),
             presenter: LauncherWindow(),
             hotkeys: FixtureHotkeys(),
@@ -381,7 +382,7 @@ enum SnapshotCommand {
         )
         let window = SettingsWindowController(
             environment: support.settingsWindowEnvironment(items: { controller.allItems }),
-            icons: FixtureIcons(),
+            icons: FixtureIcons(theme: support.environment.theme),
             hotkeys: FixtureHotkeys(),
             keyCode: LauncherController.layoutKeyCode
         )
@@ -395,6 +396,8 @@ enum SnapshotCommand {
         }
         if let select = options.select {
             window.extensions.select(try selection(select, items: controller.allItems))
+            // Like a click on the row: the table takes the keyboard (pill with the tick).
+            window.window?.makeFirstResponder(window.extensions.tableView)
         }
         if let record = options.record {
             let target: HotkeyTarget = record == "launcher" ? .launcher : .item(ItemID(rawValue: record))
@@ -452,8 +455,8 @@ enum SnapshotCommand {
 
     /// `SettingsTemplate.text` or `--settings`, with `--theme` over it.
     private static func settingsStore(_ options: Options) throws -> FixtureSettingsStore {
-        if let theme = options.theme, theme != "soprano", !FixtureSettingsStore.knownThemeIDs.contains(theme) {
-            let known = (["soprano"] + AppTheme.allThemes.map(\.id)).joined(separator: ", ")
+        if let theme = options.theme, theme != ThemeCenter.followSopranoID, !FixtureSettingsStore.knownThemeIDs.contains(theme) {
+            let known = ([ThemeCenter.followSopranoID] + AppTheme.options.map(\.id)).joined(separator: ", ")
             throw FixtureError(description: "unknown theme \(theme) (\(known))")
         }
         guard let url = options.settings else {
@@ -495,36 +498,26 @@ enum SnapshotCommand {
 
     // MARK: - Backdrop
 
-    /// A deterministic desktop: a dark gradient, a faint grid and a menu bar strip.
-    static func backdrop(size: CGSize, scale: CGFloat) -> CGImage? {
+    /// A deterministic desktop in the theme's mode: Folio's wallpaper gradient (paper
+    /// for light themes, ink for dark ones) and a menu bar strip.
+    static func backdrop(size: CGSize, scale: CGFloat, appearance: AppTheme.Appearance) -> CGImage? {
         guard let context = FixtureDrawing.makeContext(pointSize: size, scale: scale) else { return nil }
-        let colors = [FixturePalette.color(hex: 0x0B0D14).cgColor, FixturePalette.color(hex: 0x1D2133).cgColor] as CFArray
-        if let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 1]) {
+        let isLight = appearance == .light
+        let stops: [UInt32] = isLight ? [0xE8DFCF, 0xDCCFB9, 0xCDBDA3] : [0x24211D, 0x1B1916, 0x141210]
+        let colors = stops.map { FixturePalette.color(hex: $0).cgColor } as CFArray
+        if let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colors, locations: [0, 0.52, 1]) {
             context.drawLinearGradient(
                 gradient,
                 start: CGPoint(x: 0, y: 0),
-                end: CGPoint(x: size.width, y: size.height),
+                end: CGPoint(x: size.width * 0.14, y: size.height),
                 options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
             )
         }
-        context.setStrokeColor(NSColor.white.withAlphaComponent(0.04).cgColor)
-        context.setLineWidth(1)
-        let spacing: CGFloat = 64
-        var x = spacing
-        while x < size.width {
-            context.move(to: CGPoint(x: x + 0.5, y: 0))
-            context.addLine(to: CGPoint(x: x + 0.5, y: size.height))
-            x += spacing
-        }
-        var y = spacing
-        while y < size.height {
-            context.move(to: CGPoint(x: 0, y: y + 0.5))
-            context.addLine(to: CGPoint(x: size.width, y: y + 0.5))
-            y += spacing
-        }
-        context.strokePath()
         // The context's origin is top-left: the menu bar is the first `menuBarHeight` points.
-        context.setFillColor(NSColor.black.withAlphaComponent(0.45).cgColor)
+        let menuBar = isLight
+            ? NSColor(srgbRed: 246 / 255, green: 242 / 255, blue: 234 / 255, alpha: 0.82)
+            : NSColor(srgbRed: 29 / 255, green: 27 / 255, blue: 24 / 255, alpha: 0.78)
+        context.setFillColor(menuBar.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: size.width, height: menuBarHeight))
         return context.makeImage()
     }

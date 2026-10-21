@@ -323,7 +323,7 @@ struct LauncherControllerTests {
             Issue.record("no recorder overlay")
             return
         }
-        #expect(keys == KeyboardLayout.keycaps(for: recordedShiftCommandK))
+        #expect(keys == KeyboardLayout.caps(for: recordedShiftCommandK))
         #expect(conflict == nil)
         #expect(countdown == 0)
         #expect(harness.edits.isEmpty)

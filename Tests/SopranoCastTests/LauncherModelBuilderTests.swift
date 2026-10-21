@@ -20,7 +20,7 @@ struct LauncherModelBuilderTests {
         settings: CastSettings = CastSettings()
     ) -> LauncherViewModel {
         LauncherModelBuilder.model(
-            theme: AppTheme.missionControl,
+            theme: AppTheme.folioPaper,
             query: query,
             sections: sections,
             selectedIndex: selectedIndex,
@@ -31,7 +31,7 @@ struct LauncherModelBuilderTests {
             overlay: overlay,
             settings: settings,
             icon: { _ in NSImage(size: NSSize(width: 24, height: 24)) },
-            keycaps: Self.stubKeycaps
+            caps: Self.stubCaps
         )
     }
 
@@ -42,10 +42,10 @@ struct LauncherModelBuilderTests {
     /// ⌘ plus the key left of Return (0x27), which types "ä" on a German layout.
     private let physicalCommandQuote = HotkeySpec.combo(HotkeyCombo(modifiers: .command, key: .physical(0x27)))
 
-    /// A fixed layout: the German one for 0x27, `HotkeySpec.keycaps` for everything else.
-    nonisolated private static func stubKeycaps(_ spec: HotkeySpec) -> [String] {
-        guard case .combo(let combo) = spec, combo.key == .physical(0x27) else { return spec.keycaps }
-        return combo.modifiers.symbols + ["Ä"]
+    /// A fixed layout: the German one for 0x27, `HotkeySpec.caps` for everything else.
+    nonisolated private static func stubCaps(_ spec: HotkeySpec) -> [String] {
+        guard case .combo(let combo) = spec, combo.key == .physical(0x27) else { return spec.caps }
+        return spec.caps(fromKeycaps: combo.modifiers.symbols + ["Ä"])
     }
 
     @Test("rows show their kind's label; calculator rows their expression and scripts their package")
@@ -57,14 +57,14 @@ struct LauncherModelBuilderTests {
         #expect(rows.map { $0.subtitle } == ["/Applications", "", ""])
     }
 
-    @Test("rows carry the alias badge and the hotkey keycaps the layout draws")
+    @Test("rows carry the alias badge and the hotkey as the layout's K1 caps")
     func aliasAndKeycaps() {
         var settings = CastSettings()
         settings.aliases[chrome.id] = "gc"
         settings.hotkeys[chrome.id] = physicalCommandQuote
         let rows = model(sections: results([chrome, greet]), settings: settings).sections.flatMap { $0.rows }
         #expect(rows.map { $0.alias } == ["gc", nil])
-        #expect(rows[0].hotkeyKeys == ["⌘", "Ä"])
+        #expect(rows[0].hotkeyKeys == ["⌘Ä"])
         #expect(rows[1].hotkeyKeys.isEmpty)
     }
 
@@ -97,10 +97,10 @@ struct LauncherModelBuilderTests {
         #expect(model(query: "x", sections: results([chrome])).emptyText == nil)
     }
 
-    @Test("sections are titled by their kind and the placeholder is Raycast's")
+    @Test("sections are titled by their kind in sentence case and the placeholder is Raycast's")
     func sectionsAndPlaceholder() {
         let built = model(sections: results([chrome]))
-        #expect(built.sections.map { $0.title } == ["results"])
+        #expect(built.sections.map { $0.title } == ["Results"])
         #expect(built.placeholder == "Search for apps and commands…")
     }
 
@@ -112,7 +112,7 @@ struct LauncherModelBuilderTests {
         )
         let sections = results([chrome]) + [ResultSection(kind: .fallbacks, rows: [RankedItem(item: google, score: 0)])]
         let built = model(query: " gogo ", sections: sections)
-        #expect(built.sections.map { $0.title } == ["results", "use “gogo” with…"])
+        #expect(built.sections.map { $0.title } == ["Results", "Use “gogo” with…"])
         let row = built.sections[1].rows[0]
         #expect(row.subtitle == "“gogo”")
         #expect(row.accessory == ItemKind.castCommand.label)
@@ -148,7 +148,7 @@ struct LauncherModelBuilderTests {
         #expect(model(sections: sections, focus: .query, overlay: confirmation).focus == LauncherFocus.none)
     }
 
-    @Test("action rows show their shortcut keycaps and destructive style")
+    @Test("action rows show their shortcut as one K1 cap and destructive style")
     func actionRows() {
         let actions = [
             ItemAction(id: .copyPath, title: "Copy Path", shortcut: HotkeyCombo(modifiers: [.shift, .command], key: .character("c"))),
@@ -156,35 +156,36 @@ struct LauncherModelBuilderTests {
             ItemAction(id: .setHotkey, title: "Set Hotkey…"),
         ]
         let rows = LauncherModelBuilder.actionRows(actions)
-        #expect(rows[0].keys == ["⇧", "⌘", "C"])
+        #expect(rows[0].keys == ["⇧⌘C"])
         #expect(rows.map { $0.isDestructive } == [false, true, false])
         #expect(rows[2].keys.isEmpty)
     }
 
-    @Test("the recorder overlay draws a hotkey through the keycaps closure and keeps held-key display strings")
+    @Test("the recorder overlay draws a hotkey through the caps closure and held modifiers as one chord cap")
     func recorderOverlay() {
         let overlay = LauncherModelBuilder.recorder(
             itemTitle: "Google Chrome", keys: .spec(physicalCommandQuote),
             conflict: LauncherModelBuilder.conflictText(ownerTitle: "Slack"), countdown: 0.5,
-            keycaps: Self.stubKeycaps
+            caps: Self.stubCaps
         )
-        guard case .recorder(let title, let keys, let conflict, let countdown, let hint) = overlay else {
+        guard case .recorder(let title, let keys, let conflict, let countdown, let hints) = overlay else {
             Issue.record("not a recorder")
             return
         }
         #expect(title == "Google Chrome")
-        #expect(keys == ["⌘", "Ä"])
+        #expect(keys == ["⌘Ä"])
         #expect(conflict == "Used by Slack")
         #expect(countdown == 0.5)
-        #expect(hint == "⌫ clear · ⎋ cancel · ↵ save")
+        #expect(hints.map(\.caps) == [["⌫"], ["esc"], ["↵"]])
+        #expect(hints.map(\.label) == ["Clear", "Cancel", "Save"])
 
         let pending = LauncherModelBuilder.recorder(
-            itemTitle: "Google Chrome", keys: .display(["R⌘"]), conflict: nil, countdown: nil, keycaps: Self.stubKeycaps
+            itemTitle: "Google Chrome", keys: .display(["⇧", "R⌘"]), conflict: nil, countdown: nil, caps: Self.stubCaps
         )
         guard case .recorder(_, let held, _, _, _) = pending else {
             Issue.record("not a recorder")
             return
         }
-        #expect(held == ["R⌘"])
+        #expect(held == ["⇧ R⌘"])
     }
 }

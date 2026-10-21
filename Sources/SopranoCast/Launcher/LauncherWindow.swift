@@ -117,8 +117,7 @@ final class LauncherWindow: LauncherPresenting {
     }
 
     func showHUD(_ text: String, screenFrame: CGRect) {
-        let colors = (model?.theme ?? .missionControl).colors
-        hud.show(text, screenFrame: screenFrame, colors: colors, onScreen: !isOffscreen)
+        hud.show(text, screenFrame: screenFrame, theme: model?.theme ?? .folioPaper, onScreen: !isOffscreen)
     }
 
     func renderSnapshot(screenFrame: CGRect, scale: CGFloat, backdrop: CGImage?) -> CGImage? {
@@ -143,14 +142,15 @@ final class LauncherWindow: LauncherPresenting {
         if let backdrop {
             context.draw(backdrop, in: bounds)
         } else {
-            context.setFillColor((model?.theme ?? .missionControl).colors.bgBase.cgColor)
+            context.setFillColor((model?.theme ?? .folioPaper).colors.bgBase.cgColor)
             context.fill(bounds)
         }
         // AppKit frames → this context: same orientation, origin at the display's corner.
-        if isPresented, model != nil {
+        if isPresented, let model {
             content.renderLayerTree(
                 in: context,
-                at: CGPoint(x: panelFrame.minX - screenFrame.minX, y: panelFrame.minY - screenFrame.minY)
+                at: CGPoint(x: panelFrame.minX - screenFrame.minX, y: panelFrame.minY - screenFrame.minY),
+                shadow: model.theme.colors.shadowE3
             )
         }
         hud.render(in: context, screenFrame: screenFrame)
@@ -174,6 +174,7 @@ final class LauncherWindow: LauncherPresenting {
 
     private func draw(_ model: LauncherViewModel) {
         self.model = model
+        panel.appearance = model.theme.appearance.nsAppearance
         content.apply(model)
         if panel.isVisible {
             panel.invalidateShadow()
@@ -202,7 +203,7 @@ final class LauncherWindow: LauncherPresenting {
         guard current !== target else { return }
         panel.makeFirstResponder(target)
         if let field = target as? NSTextField {
-            LauncherText.moveCaretToEnd(field, caret: model.theme.colors.accent)
+            LauncherText.moveCaretToEnd(field, caret: model.theme.colors.caret)
         }
     }
 

@@ -71,7 +71,7 @@ protocol SettingsPane: NSView {
     func reload()
 }
 
-/// The settings window (Raycast's Settings, in Soprano's chrome): a sidebar of tabs and the
+/// The settings window (Raycast's Settings, in Soprano's Folio chrome): a sidebar of tabs and the
 /// tab's pane. Every control writes settings.json through `SettingsEdit`; the window keeps
 /// no settings of its own and redraws when the file changes. Hotkeys are recorded in the
 /// launcher's recorder card with the same `HotkeyRecordingSession`.
@@ -96,7 +96,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
     private(set) var currentTab: SettingsTab = .general
     private let rootView = LayerView()
     private let sidebar = LayerView()
-    private let sidebarRule = RetroRuleView(axis: .vertical, style: .single)
+    private let sidebarRule = ChromeRuleView(axis: .vertical)
     private let tabStack = NSStackView()
     private var tabButtons: [SettingsTab: SettingsTabButton] = [:]
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
@@ -141,7 +141,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
             defer: false
         )
         window.title = "Soprano Cast Settings"
-        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         window.contentMinSize = Self.minimumSize
         super.init(window: window)
@@ -420,16 +419,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
 
     private func renderRecorder() {
         guard let current = recording else { return }
-        let keys = switch current.session.keys {
-        case .spec(let spec): KeyboardLayout.keycaps(for: spec)
-        case .display(let display): display
-        }
         recorderOverlay.configure(
             title: current.title,
-            keys: keys,
+            keys: current.session.keys.caps(KeyboardLayout.caps(for:)),
             conflict: LauncherModelBuilder.conflictText(ownerTitle: current.session.owner.map { title(of: $0) }),
             countdown: current.countdown,
-            colors: theme.colors
+            theme: theme
         )
     }
 
@@ -492,8 +487,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
         sidebar.addSubview(sidebarRule)
 
         tabStack.orientation = .vertical
-        tabStack.spacing = 6
-        tabStack.edgeInsets = NSEdgeInsets(top: 14, left: 10, bottom: 14, right: 10)
+        tabStack.spacing = 2
+        tabStack.edgeInsets = NSEdgeInsets(top: 12, left: 10, bottom: 12, right: 10)
         tabStack.translatesAutoresizingMaskIntoConstraints = false
         sidebar.addSubview(tabStack)
         for tab in SettingsTab.allCases {
@@ -501,12 +496,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
             tabButtons[tab] = button
             tabStack.addArrangedSubview(button)
             NSLayoutConstraint.activate([
-                button.heightAnchor.constraint(equalToConstant: 34),
+                button.heightAnchor.constraint(equalToConstant: SettingsTabButton.height),
                 button.widthAnchor.constraint(equalToConstant: Self.sidebarWidth - 20),
             ])
         }
 
-        statusLabel.font = RetroFont.body(11)
+        statusLabel.font = ChromeFont.meta
         statusLabel.maximumNumberOfLines = 0
         statusLabel.isHidden = true
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -522,7 +517,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
             sidebarRule.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             sidebarRule.topAnchor.constraint(equalTo: sidebar.topAnchor),
             sidebarRule.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor),
-            sidebarRule.widthAnchor.constraint(equalToConstant: Retro.hairline),
 
             tabStack.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor),
             tabStack.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor),
@@ -549,7 +543,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, Sett
         rootView.color = colors.bgBase
         sidebar.color = colors.bgPanel
         contentHost.color = colors.bgBase
-        sidebarRule.color = colors.borderStrong
+        sidebarRule.color = colors.borderSubtle
+        window?.appearance = theme.appearance.nsAppearance
         window?.backgroundColor = colors.bgBase
         for button in tabButtons.values {
             button.apply(theme: theme)
@@ -630,15 +625,15 @@ final class RecorderOverlayView: FlippedView {
     /// The keycaps showing.
     var shownKeys: [String] { card.shownKeys }
 
-    func configure(title: String, keys: [String], conflict: String?, countdown: Double?, colors: ThemeColors) {
-        dim.color = colors.bgBase.withAlphaComponent(0.72)
+    func configure(title: String, keys: [String], conflict: String?, countdown: Double?, theme: AppTheme) {
+        dim.color = theme.colors.scrim
         card.configure(
             itemTitle: title,
             keys: keys,
             conflict: conflict,
             countdown: countdown,
-            hint: LauncherModelBuilder.recorderHint,
-            colors: colors
+            hints: LauncherModelBuilder.recorderHints,
+            theme: theme
         )
         needsLayout = true
         layoutSubtreeIfNeeded()

@@ -30,7 +30,6 @@ final class LauncherPanel: NSPanel {
         isMovable = false
         animationBehavior = .none
         acceptsMouseMovedEvents = true
-        appearance = NSAppearance(named: .darkAqua)
     }
 
     @available(*, unavailable)
@@ -121,11 +120,16 @@ final class LauncherContentView: LauncherFlippedView {
         let colors = theme.colors
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        appearance = theme.appearance.nsAppearance
         setFrameSize(LauncherPanel.size)
-        layer?.backgroundColor = colors.bgBase.withAlphaComponent(0.98).cgColor
-        layer?.borderColor = colors.borderStrong.cgColor
-        layer?.borderWidth = Retro.hairline
-        layer?.cornerRadius = Retro.cornerRadius
+        // Folio `.launcher`: raised, one borderSubtle hairline, radius 12, clipped. The
+        // window (or the snapshot) adds the e3 shadow outside.
+        layer?.backgroundColor = colors.raised.cgColor
+        layer?.borderColor = colors.borderSubtle.cgColor
+        layer?.borderWidth = Chrome.hairline
+        layer?.cornerRadius = Chrome.Radius.panel
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
 
         searchBar.frame = CGRect(x: 0, y: 0, width: bounds.width, height: Self.searchBarHeight)
         searchBar.configure(
@@ -133,15 +137,21 @@ final class LauncherContentView: LauncherFlippedView {
             placeholder: model.placeholder,
             arguments: model.arguments,
             focus: model.focus,
-            colors: colors
+            theme: theme
         )
 
         footer.frame = CGRect(x: 0, y: bounds.height - Self.footerHeight, width: bounds.width, height: Self.footerHeight)
-        footer.configure(model.footer, colors: colors)
+        footer.configure(model.footer, theme: theme)
 
         let listFrame = self.listFrame
         list.frame = listFrame
-        list.apply(sections: model.sections, selectedIndex: model.selectedIndex, emptyText: model.emptyText, theme: theme)
+        list.apply(
+            sections: model.sections,
+            selectedIndex: model.selectedIndex,
+            isFocused: model.focus.isInRootSearch,
+            emptyText: model.emptyText,
+            theme: theme
+        )
         output.frame = listFrame
         applyOverlay(model, theme: theme, listFrame: listFrame)
         CATransaction.commit()
@@ -149,7 +159,6 @@ final class LauncherContentView: LauncherFlippedView {
     }
 
     private func applyOverlay(_ model: LauncherViewModel, theme: AppTheme, listFrame: CGRect) {
-        let colors = theme.colors
         let overlayFocused = model.focus == .overlay
         var showsOutput = false
         var visibleCard: NSView?
@@ -159,7 +168,7 @@ final class LauncherContentView: LauncherFlippedView {
         case let .actionPanel(title, query, rows, selectedIndex):
             actionPanel.configure(
                 title: title, query: query, rows: rows, selectedIndex: selectedIndex,
-                focused: overlayFocused, colors: colors
+                focused: overlayFocused, theme: theme
             )
             let maxHeight = listFrame.height - Self.cardMargin * 2
             let height = actionPanel.preferredHeight(maxHeight: maxHeight)
@@ -172,18 +181,18 @@ final class LauncherContentView: LauncherFlippedView {
             actionPanel.layoutContents()
             actionPanel.scrollSelectionIntoView()
             visibleCard = actionPanel
-        case let .recorder(itemTitle, keys, conflict, countdown, hint):
-            recorder.configure(itemTitle: itemTitle, keys: keys, conflict: conflict, countdown: countdown, hint: hint, colors: colors)
+        case let .recorder(itemTitle, keys, conflict, countdown, hints):
+            recorder.configure(itemTitle: itemTitle, keys: keys, conflict: conflict, countdown: countdown, hints: hints, theme: theme)
             recorder.frame = centered(RecorderCardView.size(), in: listFrame)
             recorder.layoutContents()
             visibleCard = recorder
         case let .aliasEditor(itemTitle, text, error):
-            aliasEditor.configure(itemTitle: itemTitle, text: text, error: error, focused: overlayFocused, colors: colors)
+            aliasEditor.configure(itemTitle: itemTitle, text: text, error: error, focused: overlayFocused, theme: theme)
             aliasEditor.frame = centered(AliasEditorCardView.size(), in: listFrame)
             aliasEditor.layoutContents()
             visibleCard = aliasEditor
         case let .output(title, text, isError):
-            output.configure(title: title, text: text, isError: isError, colors: colors)
+            output.configure(title: title, text: text, isError: isError, theme: theme)
             output.layoutContents()
             showsOutput = true
         case let .confirmation(title, message, confirmTitle):
@@ -247,27 +256,54 @@ class LauncherFlippedView: NSView {
     override var isFlipped: Bool { true }
 
     /// Renders this view's layer tree into `context` with its bottom-left corner at
-    /// `origin` (`context` uses a bottom-left origin), with a drop shadow. Works for a
-    /// window that was never on screen: `cacheDisplay` makes AppKit build and draw every
-    /// view's layer, then Core Animation renders the tree (fills, borders, text, icons,
-    /// keycaps).
-    func renderLayerTree(in context: CGContext, at origin: CGPoint) {
+    /// `origin` (`context` uses a bottom-left origin), under `shadow` (the window's e2/e3
+    /// elevation). Works for a window that was never on screen: `cacheDisplay` makes
+    /// AppKit build and draw every view's layer, then Core Animation renders the tree
+    /// (fills, borders, text, icons, keycaps).
+    func renderLayerTree(in context: CGContext, at origin: CGPoint, shadow: ThemeShadow) {
         layoutSubtreeIfNeeded()
         if let rep = bitmapImageRepForCachingDisplay(in: bounds) {
             cacheDisplay(in: bounds, to: rep)
         }
         guard let layer else { return }
         context.saveGState()
-        context.setShadow(offset: CGSize(width: 0, height: -10), blur: 30, color: NSColor.black.withAlphaComponent(0.55).cgColor)
+        context.setShadow(
+            offset: CGSize(width: 0, height: -shadow.offsetY),
+            blur: shadow.blur,
+            color: shadow.color.withAlphaComponent(CGFloat(shadow.opacity)).cgColor
+        )
         context.beginTransparencyLayer(auxiliaryInfo: nil)
         context.translateBy(x: origin.x, y: origin.y)
         if layer.isGeometryFlipped {
             context.translateBy(x: 0, y: bounds.height)
             context.scaleBy(x: 1, y: -1)
         }
+        // Core Graphics draws shadows in device space, ignoring the flip above: a shadow
+        // set to cast down in the flipped tree would render upward. Mirror the offsets for
+        // the render and put them back after.
+        let shadowed = layer.isGeometryFlipped ? Self.shadowedSublayers(of: layer) : []
+        let offsets = shadowed.map(\.shadowOffset)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for sublayer in shadowed {
+            sublayer.shadowOffset.height = -sublayer.shadowOffset.height
+        }
         layer.render(in: context)
+        for (sublayer, offset) in zip(shadowed, offsets) {
+            sublayer.shadowOffset = offset
+        }
+        CATransaction.commit()
         context.endTransparencyLayer()
         context.restoreGState()
+    }
+
+    /// Every visible layer under `layer` that casts a shadow.
+    private static func shadowedSublayers(of layer: CALayer) -> [CALayer] {
+        (layer.sublayers ?? []).flatMap { sublayer -> [CALayer] in
+            guard !sublayer.isHidden else { return [] }
+            let own = sublayer.shadowOpacity > 0 && sublayer.shadowOffset.height != 0 ? [sublayer] : []
+            return own + shadowedSublayers(of: sublayer)
+        }
     }
 }
 
@@ -330,19 +366,21 @@ enum LauncherText {
             || command == #selector(NSResponder.cancelOperation(_:))
     }
 
-    /// A title with the search hits in `highlight`.
+    /// A title with the search hits in `matchFont` and `matchColor` (Folio: Semibold ink,
+    /// `matchOnSelection` on the selected row only).
     static func title(
         _ text: String,
         highlights: [NSRange],
         font: NSFont,
         color: NSColor,
-        highlight: NSColor
+        matchFont: NSFont,
+        matchColor: NSColor
     ) -> NSAttributedString {
         let string = NSMutableAttributedString(attributedString: plain(text, font: font, color: color))
         let length = string.length
         for range in highlights where range.location != NSNotFound && range.location < length {
             let clamped = NSRange(location: range.location, length: min(range.length, length - range.location))
-            string.addAttribute(.foregroundColor, value: highlight, range: clamped)
+            string.addAttributes([.foregroundColor: matchColor, .font: matchFont], range: clamped)
         }
         return string
     }
@@ -389,12 +427,43 @@ enum LauncherText {
     }
 }
 
-/// One key of a shortcut: a square-cornered `bgRaised` cap with a `borderStrong` hairline
-/// and the key in the display face.
-final class KeycapView: LauncherFlippedView {
-    static let horizontalPadding: CGFloat = 5
+/// Launcher keycap sizes (Folio `.kbd`, `.kbd-sm`, `.kbd-lg`).
+enum LauncherKeycapStyle {
+    /// 18 pt, radius 4, SF 11 Medium: rows, footer, Action Panel.
+    case standard
+    /// 16 pt: hint rows.
+    case small
+    /// 36 pt, radius 6, SF 20 Medium: the recorder's keys.
+    case large
 
-    private var text = NSAttributedString()
+    var height: CGFloat {
+        switch self {
+        case .standard: Chrome.keycapHeight
+        case .small: Chrome.keycapHeightSmall
+        case .large: 36
+        }
+    }
+
+    var padding: CGFloat {
+        switch self {
+        case .standard: 5
+        case .small: 4
+        case .large: 10
+        }
+    }
+
+    var radius: CGFloat { self == .large ? Chrome.Radius.control : Chrome.Radius.cap }
+    var font: NSFont { self == .large ? ChromeFont.sans(size: 20, weight: .medium) : ChromeFont.keycap }
+}
+
+/// One K1 cap, drawn like Chrome's `ChromeKeycapView` (`keycapFill`, `keycapEdge`) but
+/// laid out by frame like every launcher view.
+final class KeycapView: LauncherFlippedView {
+    private var legend = ""
+    private var style = LauncherKeycapStyle.standard
+    private var fill = NSColor.clear
+    private var edge = NSColor.clear
+    private var ink = NSColor.clear
     private(set) var preferredWidth: CGFloat = 0
 
     init() {
@@ -407,26 +476,23 @@ final class KeycapView: LauncherFlippedView {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(_ key: String, fontSize: CGFloat, height: CGFloat, colors: ThemeColors) {
-        text = RetroText.display(key, color: colors.textPrimary, size: fontSize, tracking: 0, lineBreakMode: .byClipping)
-        preferredWidth = max(height, ceil(text.size().width) + Self.horizontalPadding * 2)
-        layer?.backgroundColor = colors.bgRaised.cgColor
-        layer?.borderColor = colors.borderStrong.cgColor
-        layer?.borderWidth = Retro.hairline
-        layer?.cornerRadius = Retro.cornerRadius
+    /// `muted` draws the legend in `textMuted` (hint rows).
+    func configure(_ legend: String, style: LauncherKeycapStyle, muted: Bool, colors: ThemeColors) {
+        self.legend = legend
+        self.style = style
+        fill = colors.keycapFill
+        edge = colors.keycapEdge
+        ink = muted ? colors.textMuted : colors.textPrimary
+        preferredWidth = ChromeKeycapView.capWidth(legend, font: style.font, height: style.height, padding: style.padding)
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let size = text.size()
-        text.draw(at: NSPoint(
-            x: ((bounds.width - size.width) / 2).rounded(),
-            y: ((bounds.height - size.height) / 2).rounded()
-        ))
+        ChromeKeycapView.drawCap(legend, in: bounds, fill: fill, edge: edge, text: ink, font: style.font, radius: style.radius)
     }
 }
 
-/// A row of keycaps ("⌘", "K"), left to right; cap views are reused.
+/// K1 caps left to right with a 3 pt gap ("⌃A" then "P"); cap views are reused.
 final class KeycapRowView: LauncherFlippedView {
     static let gap: CGFloat = 3
 
@@ -445,9 +511,9 @@ final class KeycapRowView: LauncherFlippedView {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(keys: [String], fontSize: CGFloat, height: CGFloat, colors: ThemeColors) {
+    func configure(keys: [String], style: LauncherKeycapStyle = .standard, muted: Bool = false, colors: ThemeColors) {
         self.keys = keys
-        capHeight = height
+        capHeight = style.height
         while caps.count > keys.count {
             caps.removeLast().removeFromSuperview()
         }
@@ -457,7 +523,7 @@ final class KeycapRowView: LauncherFlippedView {
             caps.append(cap)
         }
         for (cap, key) in zip(caps, keys) {
-            cap.configure(key, fontSize: fontSize, height: height, colors: colors)
+            cap.configure(key, style: style, muted: muted, colors: colors)
         }
         let widths = caps.map(\.preferredWidth).reduce(0, +)
         preferredWidth = caps.isEmpty ? 0 : widths + Self.gap * CGFloat(caps.count - 1)
@@ -480,10 +546,10 @@ final class KeycapRowView: LauncherFlippedView {
     }
 }
 
-/// A badge: display-face text in `textMuted` on `bgRaised` with a `borderSubtle` hairline.
+/// The alias badge: SF 11 muted on `raised` in a radius-4 chip with a `borderSubtle` edge.
 final class BadgeChipView: LauncherFlippedView {
-    static let height: CGFloat = 18
-    static let horizontalPadding: CGFloat = 5
+    static let height: CGFloat = Chrome.chipHeight
+    static let horizontalPadding: CGFloat = 6
 
     private var text = NSAttributedString()
     private(set) var preferredWidth: CGFloat = 0
@@ -499,12 +565,12 @@ final class BadgeChipView: LauncherFlippedView {
     }
 
     func configure(text: String, colors: ThemeColors) {
-        self.text = RetroText.display(text, color: colors.textMuted, lineBreakMode: .byClipping)
+        self.text = ChromeText.attributed(text, font: ChromeFont.meta, color: colors.textMuted, lineBreakMode: .byClipping)
         preferredWidth = ceil(self.text.size().width) + Self.horizontalPadding * 2
-        layer?.backgroundColor = colors.bgRaised.cgColor
+        layer?.backgroundColor = colors.raised.cgColor
         layer?.borderColor = colors.borderSubtle.cgColor
-        layer?.borderWidth = Retro.hairline
-        layer?.cornerRadius = Retro.cornerRadius
+        layer?.borderWidth = Chrome.hairline
+        layer?.cornerRadius = Chrome.Radius.cap
         needsDisplay = true
     }
 
