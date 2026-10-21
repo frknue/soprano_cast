@@ -1019,8 +1019,8 @@ Controller behavior:
   (arguments after it); `toggle`, `open`, `list`, `help`, `--help` →
   `CLIClient.run(arguments:)` (command word included); both exit. Anything else starts
   the GUI with `.accessory` policy and `AppDelegate`.
-- `AppDelegate` (composition root): leaves `NSApp.appearance` unset (each window takes
-  the resolved theme's); single-instance guard (a second instance terminates);
+- `AppDelegate` (composition root): sets no appearance itself (`ThemeCenter` sets
+  `NSApp.appearance`; each window takes the resolved theme's); single-instance guard (a second instance terminates);
   `SettingsCenter.shared.start()`; `ThemeCenter.shared.start()`; `LiveAppCatalog`,
   `LiveSettingsPaneCatalog`, `ScriptCatalog` (sharing the
   `ScriptRunner`), `LiveIconProvider`, `LiveWindowManager`, `SystemCommandRunner`,
@@ -1090,7 +1090,11 @@ Controller behavior:
   Folio Paper or Folio Ink (`AppTheme.theme(for:appearance:)`); pinned and third-party ids
   ignore the appearance. The system appearance is `NSApp.effectiveAppearance`, observed
   with KVO (`systemAppearanceDidChange()`); observers fire only when the resolved palette
-  changes. Known ids for the resolver: `ThemeCenter.knownThemeIDs` (`AppTheme.options`).
+  changes. `NSApp.appearance` is the resolved theme's `nsAppearance` (so menus, pop-ups,
+  sheets and the status-item menu match pinned and third-party themes), and nil only while
+  the palette follows macOS (`ThemeCenter.followsSystem(themeID:soprano:)`: `folio` or an
+  unknown id, or Soprano's folio with `appearance: system`); it is cleared before reading
+  the system appearance. Known ids for the resolver: `ThemeCenter.knownThemeIDs` (`AppTheme.options`).
 - `AppStateStore(defaults: UserDefaults = .standard)`: usage records and search history as
   JSON data under `castUsage` / `castHistory` (unreadable data → empty).
 - `MenuBarController(controller:settings:hotkeyProblems:openPermissions:openSettings:)`: status item (16 pt

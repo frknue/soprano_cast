@@ -126,8 +126,9 @@ copied or not built yet; `docs/STATUS.md` the current state.
   case; the view uppercases eyebrows (`ChromeText.eyebrow`). Hotkeys reach views as K1
   caps (`KeyboardLayout.caps(for:)`, one cap per chord). Accent marks only the caret, the
   pencil tick and matches on the selected row. Every window and panel takes its
-  appearance from the resolved theme (`theme.appearance.nsAppearance`); `NSApp.appearance`
-  stays unset so `folio` can follow the system.
+  appearance from the resolved theme (`theme.appearance.nsAppearance`); `ThemeCenter`
+  sets `NSApp.appearance` the same way (menus, pop-ups, sheets) and leaves it nil only
+  while the palette follows macOS (`ThemeCenter.followsSystem`).
 - Core is AppKit-free and everything in it is `public`.
 - `System/` is the only place that touches AX, Carbon hotkeys, `CGEventTap`, `hidutil`,
   Apple events or private symbols. The launcher talks to it only through the protocols in

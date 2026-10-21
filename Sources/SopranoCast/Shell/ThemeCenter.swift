@@ -8,6 +8,10 @@ import SopranoCastCore
 /// resolves to Folio Paper or Folio Ink from the appearance: Soprano's `appearance` while
 /// following Soprano unless it is `system`, else the system's. Observers fire when the
 /// resolved palette changes, so a system light/dark switch reaches them under `folio`.
+///
+/// The app appearance (menus, pop-ups, sheets, the status-item menu) is the resolved
+/// theme's; it is unset (nil) only while the palette follows macOS, so the system's
+/// light/dark switch reaches `NSApp.effectiveAppearance`.
 @MainActor
 final class ThemeCenter {
     static let shared = ThemeCenter()
@@ -24,6 +28,7 @@ final class ThemeCenter {
 
     private let settingsCenter: SettingsCenter
     private let systemAppearance: @MainActor () -> AppTheme.Appearance
+    private let setApplicationAppearance: @MainActor (NSAppearance?) -> Void
     private var sopranoWatcher: ConfigFileWatcher?
     private var appearanceObservation: NSKeyValueObservation?
     private let observers = ObserverList<Void>()
@@ -34,11 +39,15 @@ final class ThemeCenter {
         settings: SettingsCenter = .shared,
         systemAppearance: @escaping @MainActor () -> AppTheme.Appearance = {
             AppTheme.Appearance(NSApplication.shared.effectiveAppearance)
+        },
+        setApplicationAppearance: @escaping @MainActor (NSAppearance?) -> Void = {
+            NSApplication.shared.appearance = $0
         }
     ) {
         self.sopranoSettingsURL = sopranoSettingsURL
         self.settingsCenter = settings
         self.systemAppearance = systemAppearance
+        self.setApplicationAppearance = setApplicationAppearance
     }
 
     /// Applies the current settings and follows their changes and the system appearance.
@@ -85,16 +94,31 @@ final class ThemeCenter {
         return AppTheme.theme(for: followed.theme ?? AppTheme.folioId, appearance: appearance)
     }
 
+    /// Whether the palette for `themeID` comes from the macOS appearance: `folio` or an
+    /// unknown id, or following Soprano while Soprano's `appearance` is `system` and its
+    /// theme is not a concrete palette.
+    static func followsSystem(themeID: String, soprano: SopranoThemeSettings?) -> Bool {
+        let isPalette: (String) -> Bool = { id in AppTheme.allThemes.contains { $0.id == id } }
+        guard themeID == followSopranoID else { return !isPalette(themeID) }
+        let followed = soprano ?? SopranoThemeSettings()
+        return followed.appearance == .system && !isPalette(followed.theme ?? AppTheme.folioId)
+    }
+
     private func apply() {
         let themeID = settingsCenter.settings.theme
         let followsSoprano = themeID == Self.followSopranoID
         updateSopranoWatcher(enabled: followsSoprano)
+        let soprano = followsSoprano ? readSopranoSettings() : nil
+        let followsSystem = Self.followsSystem(themeID: themeID, soprano: soprano)
+        // Unpinned first, so `systemAppearance` reads macOS rather than the last pin.
+        if followsSystem {
+            setApplicationAppearance(nil)
+        }
         let previous = theme.id
-        theme = Self.resolve(
-            themeID: themeID,
-            soprano: followsSoprano ? readSopranoSettings() : nil,
-            system: systemAppearance()
-        )
+        theme = Self.resolve(themeID: themeID, soprano: soprano, system: systemAppearance())
+        if !followsSystem {
+            setApplicationAppearance(theme.appearance.nsAppearance)
+        }
         if theme.id != previous {
             observers.notify(())
         }

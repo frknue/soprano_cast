@@ -278,9 +278,32 @@ class LauncherFlippedView: NSView {
             context.translateBy(x: 0, y: bounds.height)
             context.scaleBy(x: 1, y: -1)
         }
+        // Core Graphics draws shadows in device space, ignoring the flip above: a shadow
+        // set to cast down in the flipped tree would render upward. Mirror the offsets for
+        // the render and put them back after.
+        let shadowed = layer.isGeometryFlipped ? Self.shadowedSublayers(of: layer) : []
+        let offsets = shadowed.map(\.shadowOffset)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for sublayer in shadowed {
+            sublayer.shadowOffset.height = -sublayer.shadowOffset.height
+        }
         layer.render(in: context)
+        for (sublayer, offset) in zip(shadowed, offsets) {
+            sublayer.shadowOffset = offset
+        }
+        CATransaction.commit()
         context.endTransparencyLayer()
         context.restoreGState()
+    }
+
+    /// Every visible layer under `layer` that casts a shadow.
+    private static func shadowedSublayers(of layer: CALayer) -> [CALayer] {
+        (layer.sublayers ?? []).flatMap { sublayer -> [CALayer] in
+            guard !sublayer.isHidden else { return [] }
+            let own = sublayer.shadowOpacity > 0 && sublayer.shadowOffset.height != 0 ? [sublayer] : []
+            return own + shadowedSublayers(of: sublayer)
+        }
     }
 }
 

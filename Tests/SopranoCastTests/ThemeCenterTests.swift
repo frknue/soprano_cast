@@ -61,7 +61,10 @@ struct ThemeCenterTests {
         let settings = SettingsCenter(fileURL: url)
         settings.start(watching: false)
         let system = SystemBox()
-        let center = ThemeCenter(sopranoSettingsURL: url, settings: settings, systemAppearance: { system.appearance })
+        let center = ThemeCenter(
+            sopranoSettingsURL: url, settings: settings,
+            systemAppearance: { system.appearance }, setApplicationAppearance: { _ in }
+        )
         let owner = NSObject()
         var notifications = 0
         center.addObserver(owner) { notifications += 1 }
@@ -76,5 +79,46 @@ struct ThemeCenterTests {
         center.systemAppearanceDidChange()
         #expect(notifications == 1)
         withExtendedLifetime(owner) {}
+    }
+
+    @Test("only a palette that follows macOS leaves the app appearance unset")
+    func followsSystemRule() {
+        #expect(ThemeCenter.followsSystem(themeID: "folio", soprano: nil))
+        #expect(ThemeCenter.followsSystem(themeID: "mission-control", soprano: nil))
+        #expect(!ThemeCenter.followsSystem(themeID: "folio-paper", soprano: nil))
+        #expect(!ThemeCenter.followsSystem(themeID: "nord", soprano: nil))
+        #expect(ThemeCenter.followsSystem(themeID: "soprano", soprano: nil))
+        #expect(ThemeCenter.followsSystem(themeID: "soprano", soprano: SopranoThemeSettings(theme: "folio", appearance: .system)))
+        #expect(!ThemeCenter.followsSystem(themeID: "soprano", soprano: SopranoThemeSettings(theme: "folio", appearance: .dark)))
+        #expect(!ThemeCenter.followsSystem(themeID: "soprano", soprano: SopranoThemeSettings(theme: "dracula", appearance: .system)))
+    }
+
+    @Test("the app appearance is the pinned or third-party theme's, and unset while folio follows the system")
+    func applicationAppearanceFollowsTheTheme() throws {
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try write(#"{ "theme": "folio" }"#, to: url)
+        let settings = SettingsCenter(fileURL: url)
+        settings.start(watching: false)
+        var applied: [NSAppearance.Name?] = []
+        let center = ThemeCenter(
+            sopranoSettingsURL: url, settings: settings,
+            systemAppearance: { .light }, setApplicationAppearance: { applied.append($0?.name) }
+        )
+        center.start()
+        #expect(applied.last == .some(nil))
+
+        try write(#"{ "theme": "nord" }"#, to: url)
+        settings.reload()
+        #expect(center.theme.id == "nord")
+        #expect(applied.last == .darkAqua)
+
+        try write(#"{ "theme": "folio-paper" }"#, to: url)
+        settings.reload()
+        #expect(applied.last == .aqua)
+
+        try write(#"{ "theme": "folio" }"#, to: url)
+        settings.reload()
+        #expect(applied.last == .some(nil))
     }
 }
