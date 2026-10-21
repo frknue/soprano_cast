@@ -154,4 +154,34 @@ struct HotkeyParsingTests {
         #expect(HotkeySpec(settingsText: "both:cmd")?.displayString == "L⌘R⌘")
         #expect(HotkeySpec(settingsText: "hyper+1")?.displayString == "✦1")
     }
+
+    @Test("K1 caps put a chord in one cap and a double tap in two")
+    func k1Caps() {
+        let expected: [(String, [String])] = [
+            ("cmd+1", ["⌘1"]),
+            ("cmd+shift+k", ["⇧⌘K"]),
+            ("hyper+1", ["✦1"]),
+            ("ctrl+opt+left", ["⌃⌥←"]),
+            ("fn+a", ["fn A"]),
+            ("cmd+fn+a", ["⌘ fn A"]),
+            ("cmd+f13", ["⌘F13"]),
+            ("f13", ["F13"]),
+            ("rcmd", ["R⌘"]),
+            ("cmd+lopt", ["L⌥ ⌘"]),
+            ("fn", ["fn"]),
+            ("double:cmd", ["⌘", "⌘"]),
+            ("double:rshift", ["R⇧", "R⇧"]),
+            ("both:cmd", ["L⌘ R⌘"]),
+        ]
+        for (text, caps) in expected {
+            #expect(HotkeySpec(settingsText: text)?.caps == caps, "\(text)")
+        }
+    }
+
+    @Test("caps from layout keycaps replace only a combo's key")
+    func capsFromKeycaps() {
+        let spec = HotkeySpec(settingsText: "cmd+key:'")
+        #expect(spec?.caps(fromKeycaps: ["⌘", "Ä"]) == ["⌘Ä"])
+        #expect(spec?.caps(fromKeycaps: []) == [])
+    }
 }

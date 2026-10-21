@@ -3,7 +3,7 @@
 **A keyboard launcher for macOS, in the Soprano family.**
 
 Soprano Cast is a copy of [Raycast](https://www.raycast.com)'s Root Search and hotkeys in
-Soprano's "Mission Control" chrome: `⌘Space` opens a search over your apps, system
+Soprano's Folio chrome (Folio Paper or Folio Ink): `⌘Space` opens a search over your apps, system
 commands, window management, System Settings panes, quicklinks and script commands, with an
 inline calculator.
 Any of them can get a global hotkey of every kind Raycast offers (`⌘1` for Google Chrome,
@@ -18,8 +18,8 @@ used.
 ```
 
 The installer never restarts a running Soprano Cast; the update applies on the next
-launch. Launch at login is on by default. The icon in the menu bar (a square with a
-slanted beam) means it is running.
+launch. Launch at login is on by default. The icon in the menu bar (a search field with a
+lens and a caret) means it is running.
 
 The first launch asks macOS once for Accessibility and opens the permissions window while
 it is missing. Combo hotkeys like `⌘1` for apps, quicklinks and scripts work without it;
@@ -52,10 +52,10 @@ importer for Raycast's export yet.
 
 ## Root Search
 
-**Sections.** With an empty search field: **favorites** (in your order) and
-**suggestions** (up to 6 items you use most, by frecency; favorites excluded, only items
-used at least once). With a query: **calculator** (when the query is a calculation),
-**results** (up to 60), and the fallbacks at the end under `use “<query>” with…`
+**Sections.** With an empty search field: **Favorites** (in your order) and
+**Suggestions** (up to 6 items you use most, by frecency; favorites excluded, only items
+used at least once). With a query: **Calculator** (when the query is a calculation),
+**Results** (up to 60), and the fallbacks at the end under `Use “<query>” with…`
 (`fallbacks`, by default Search Google), each showing your query. Empty sections are
 hidden. "No results" shows when nothing matches, "Type to search apps and commands" when
 there is nothing to suggest.
@@ -219,7 +219,7 @@ is in front with a window on screen, it hides the app, as in Raycast. A frontmos
 without windows (Finder on the desktop) gets a new window instead.
 
 **Recording.** Set Hotkey… (in `⌘K` or `⇧⌘,`) opens the recorder, showing the current
-hotkey or "recording…". Press the combo, tap the modifier(s), tap one twice, or hold both
+hotkey or "Recording…". Press the combo, tap the modifier(s), tap one twice, or hold both
 sides; the keycaps show what was recorded, and it saves after 1.5 s. `↵` saves now, `⌫`
 removes the hotkey, `⎋` cancels. Holding `⌃⌥⇧⌘` records those four modifiers, not
 `hyper`; write `hyper+…` in settings.json for Hyper hotkeys. While recording, every other
@@ -423,7 +423,9 @@ A file that is not valid JSON keeps the last good settings running.
 
 ```jsonc
 {
-  // A Soprano theme id, or "soprano" to follow Soprano's own theme setting.
+  // "soprano" follows Soprano's theme and appearance; "folio" (Paper or Ink) follows the
+  // system appearance; or a pinned theme: folio-paper, folio-ink, gruvbox-dark,
+  // catppuccin-mocha, dracula, solarized-dark, nord, tokyo-night, atom-one-dark.
   "theme": "soprano",
 
   "launcher": {
@@ -591,18 +593,19 @@ newer one. `snapshot` renders the real launcher on fixture apps and scripts offs
 without hotkeys or permissions. `--keys` replays key tokens (`cmd+k`, `shift+cmd+,`,
 `key:'`, `rec:<hotkey>` to record a hotkey, `wait` to let the recorder's countdown or a
 toast timer run; time stands still otherwise); `--settings <jsonc>`, `--screen 1512x982`
-and `--theme <id>` vary the setup, and `--report` writes the query, rows, selection,
+and `--theme <id>` vary the setup (snapshots draw Folio Paper; `--theme folio-ink` draws
+Ink), and `--report` writes the query, rows, selection,
 overlay, footer toast, runs and settings edits as JSON. `--settings-window general`,
 `extensions` or `advanced` renders the settings window instead (`--select` a row or
 `group:<group>`, `--filter` its table, `--record` a hotkey with `--keys`). `snapshot`
 without options prints its full usage. The dev app (`com.soprano.cast.dev`) has its own
 permissions and state, and its command line only reaches the dev app; the bare
 `.build/debug/SopranoCast` reaches the installed app. The design system
-(`Sources/SopranoCast/Vendored/`) and `JSONCText` come from Soprano; update them with
+(`Sources/SopranoCast/Vendored/`), `JSONCText` and the app icon renderer
+(`scripts/render-app-icon.swift`) come from Soprano; update them with
 `scripts/sync-soprano-chrome.sh` instead of editing them here. `docs/ARCHITECTURE.md`
 describes the modules, and `docs/ROADMAP.md` lists what is not copied.
 
 ## License
 
-[MIT](LICENSE). Departure Mono is © Helena Zhang, SIL Open Font License
-(`Support/Licenses/LICENSE-departure-mono`).
+[MIT](LICENSE).

@@ -1,9 +1,9 @@
 import AppKit
 import SopranoCastCore
 
-/// The onboarding window (Soprano Tab's): one row for Accessibility with its lamp, what it
-/// enables and a key to System Settings. Polls every second while visible, so the lamp
-/// lights up as soon as the user grants access.
+/// The onboarding window (Soprano Tab's): one row for Accessibility with its status mark,
+/// what it enables and a key to System Settings. Polls every second while visible, so the
+/// mark turns to granted as soon as the user grants access.
 @MainActor
 final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
     static let contentSize = NSSize(width: 560, height: 130)
@@ -14,7 +14,7 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
     private let backgroundView = ThemedBackgroundView(
         frame: NSRect(origin: .zero, size: PermissionsWindowController.contentSize)
     )
-    private let heading: RetroHeadingView
+    private let heading = NSTextField(labelWithString: "")
     private let accessibilityRow: PermissionRowView
     private var pollTimer: Timer?
 
@@ -22,10 +22,9 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
         self.status = status
         fixedTheme = theme
         let theme = theme ?? ThemeCenter.shared.theme
-        heading = RetroHeadingView(title: "permissions", theme: theme)
         accessibilityRow = PermissionRowView(
-            name: "accessibility",
-            detail: "window management, modifier-only hotkeys and the Hyper key",
+            name: "Accessibility",
+            detail: "Window management, modifier-only hotkeys and the Hyper key",
             theme: theme
         )
 
@@ -36,7 +35,6 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.title = "Soprano Cast Permissions"
-        window.appearance = NSAppearance(named: .darkAqua)
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.contentView = backgroundView
@@ -70,7 +68,7 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
         pollTimer = nil
     }
 
-    /// Re-reads the status and relights the lamp.
+    /// Re-reads the status and redraws the row.
     func refresh() {
         accessibilityRow.granted = status().accessibility
     }
@@ -121,8 +119,9 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
 
     private func apply(theme: AppTheme) {
         backgroundView.color = theme.colors.bgBase
+        window?.appearance = theme.appearance.nsAppearance
         window?.backgroundColor = theme.colors.bgBase
-        heading.apply(theme: theme)
+        heading.setChromeText("Permissions", font: ChromeFont.headline, color: theme.colors.textPrimary)
         accessibilityRow.apply(theme: theme)
     }
 
@@ -144,55 +143,51 @@ final class PermissionsWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-/// The permission row: lamp, name, what it enables, and the System Settings key.
+/// The permission row: status mark, name, what it enables, and the System Settings key.
 @MainActor
 private final class PermissionRowView: NSView {
-    static let lampSize: CGFloat = 10
-
     var granted = false {
         didSet { restyle() }
     }
 
-    private let lamp = NSView()
+    private let mark = ChromeStatusMark(size: Chrome.statusMark)
     private let nameLabel = NSTextField(labelWithString: "")
     private let detailLabel = NSTextField(wrappingLabelWithString: "")
-    private let button: RetroButton
+    private let button: ChromeButton
     private let name: String
     private var theme: AppTheme
 
     init(name: String, detail: String, theme: AppTheme) {
         self.name = name
         self.theme = theme
-        button = RetroButton(title: "Open System Settings", theme: theme)
+        button = ChromeButton(title: "Open System Settings", theme: theme)
         super.init(frame: .zero)
         button.target = self
         button.action = #selector(openSettings)
         detailLabel.stringValue = detail
-        detailLabel.font = RetroFont.body(12)
+        detailLabel.font = ChromeFont.meta
         detailLabel.isSelectable = false
 
-        lamp.wantsLayer = true
-        lamp.layer?.cornerRadius = Self.lampSize / 2
-        for view in [lamp, nameLabel, detailLabel, button] {
+        for view in [mark, nameLabel, detailLabel, button] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
         }
         nameLabel.lineBreakMode = .byTruncatingTail
         button.setContentHuggingPriority(.required, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         detailLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        addSubview(lamp)
+        addSubview(mark)
         addSubview(nameLabel)
         addSubview(detailLabel)
         addSubview(button)
 
         NSLayoutConstraint.activate([
-            lamp.leadingAnchor.constraint(equalTo: leadingAnchor),
-            lamp.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
-            lamp.widthAnchor.constraint(equalToConstant: Self.lampSize),
-            lamp.heightAnchor.constraint(equalToConstant: Self.lampSize),
+            mark.leadingAnchor.constraint(equalTo: leadingAnchor),
+            mark.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
+            mark.widthAnchor.constraint(equalToConstant: Chrome.statusMark),
+            mark.heightAnchor.constraint(equalToConstant: Chrome.statusMark),
 
             nameLabel.topAnchor.constraint(equalTo: topAnchor),
-            nameLabel.leadingAnchor.constraint(equalTo: lamp.trailingAnchor, constant: 10),
+            nameLabel.leadingAnchor.constraint(equalTo: mark.trailingAnchor, constant: 10),
             nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: button.leadingAnchor, constant: -16),
 
             detailLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
@@ -232,11 +227,12 @@ private final class PermissionRowView: NSView {
 
     private func restyle() {
         let colors = theme.colors
-        RetroLamp.light(lamp, color: granted ? colors.success : colors.danger)
-        nameLabel.setRetroText(name, color: colors.textPrimary)
+        mark.shape = granted ? .dot : .diamond
+        mark.color = granted ? colors.success : colors.danger
+        nameLabel.setChromeText(name, font: ChromeFont.row, color: colors.textPrimary)
         detailLabel.textColor = colors.textMuted
-        // A missing grant lights the key, so the next step is obvious.
-        button.kind = granted ? .standard : .prominent
+        // A missing grant inks the key, so the next step is obvious.
+        button.kind = granted ? .standard : .ink
         setAccessibilityLabel("\(name), \(granted ? "granted" : "missing")")
     }
 

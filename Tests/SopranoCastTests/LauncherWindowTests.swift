@@ -19,7 +19,7 @@ struct LauncherWindowTests {
 
         #expect(window.isPresented)
         #expect(window.rowViews.count == 3)
-        #expect(window.content.list.headerViews.map { $0.title } == ["favorites", "results"])
+        #expect(window.content.list.headerViews.map { $0.title } == ["Favorites", "Results"])
         let image = try #require(window.renderSnapshot(screenFrame: screen, scale: 2, backdrop: nil))
         #expect(image.width == 3024)
         #expect(image.height == 1898)
@@ -41,7 +41,7 @@ struct LauncherWindowTests {
         window.present(model(selectedIndex: 0), screenFrame: screen)
         let before = window.rowViews
         #expect(before.map { $0.isSelected } == [true, false, false])
-        #expect(before[0].shownHotkeyKeys == ["⌘", "1"])
+        #expect(before[0].shownHotkeyKeys == ["⌘1"])
 
         window.update(model(selectedIndex: 2))
 
@@ -62,7 +62,7 @@ struct LauncherWindowTests {
             query: "",
             rows: [
                 ActionRowViewModel(title: "Open Application", keys: ["↵"], isDestructive: false),
-                ActionRowViewModel(title: "Quit Application", keys: ["⌃", "⌘", "Q"], isDestructive: true),
+                ActionRowViewModel(title: "Quit Application", keys: ["⌃⌘Q"], isDestructive: true),
             ],
             selectedIndex: 0
         ), focus: .overlay))
@@ -72,12 +72,12 @@ struct LauncherWindowTests {
         #expect(window.renderSnapshot(screenFrame: screen, scale: 1, backdrop: nil) != nil)
 
         window.update(model(overlay: .recorder(
-            itemTitle: "Google Chrome", keys: ["⌘", "1"], conflict: "Used by Safari", countdown: 0.5,
-            hint: "⌫ clear · ⎋ cancel · ↵ save"
+            itemTitle: "Google Chrome", keys: ["⌘1"], conflict: "Used by Safari", countdown: 0.5,
+            hints: LauncherModelBuilder.recorderHints
         ), focus: .none))
         #expect(content.actionPanel.isHidden)
         #expect(!content.recorder.isHidden)
-        #expect(content.recorder.shownKeys == ["⌘", "1"])
+        #expect(content.recorder.shownKeys == ["⌘1"])
         #expect(content.recorder.countdownWidth == (RecorderCardView.width - RecorderCardView.padding * 2) / 2)
         #expect(window.renderSnapshot(screenFrame: screen, scale: 1, backdrop: nil) != nil)
 
@@ -98,9 +98,41 @@ struct LauncherWindowTests {
         #expect(content.output.isHidden)
         #expect(!content.list.isHidden)
         #expect(!content.confirmation.isHidden)
-        #expect(content.confirmation.confirmButtonTitle == "Shut Down ↵")
+        #expect(content.confirmation.confirmButtonTitle == "Shut Down")
         let image = try #require(window.renderSnapshot(screenFrame: screen, scale: 2, backdrop: nil))
         #expect(image.width == 3024)
+    }
+
+    @Test("the selection is a focused pill while Root Search has the keyboard and a muted one behind an overlay")
+    func selectionPillFollowsFocus() {
+        let window = LauncherWindow()
+        window.present(model(focus: .query), screenFrame: screen)
+        #expect(window.rowViews.map(\.pillStyle) == [.selected, .none, .none])
+
+        window.update(model(overlay: .confirmation(title: "Shut Down", message: "", confirmTitle: "Shut Down"), focus: .none))
+        #expect(window.rowViews[0].pillStyle == .selectedUnfocused)
+    }
+
+    @Test("matched characters are ink on other rows and matchOnSelection only on the selected row")
+    func matchesUseAccentOnlyWhenSelected() {
+        let window = LauncherWindow()
+        window.present(model(selectedIndex: 0), screenFrame: screen)
+        let colors = AppTheme.folioPaper.colors
+        let selected = window.rowViews[0].titleText
+        let other = window.rowViews[1].titleText
+        #expect(selected.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor == colors.matchOnSelection)
+        #expect(other.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor == colors.textPrimary)
+        let weight = (other.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)?.fontDescriptor
+            .object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any]
+        #expect((weight?[.weight] as? CGFloat ?? 0) > NSFont.Weight.regular.rawValue)
+    }
+
+    @Test("Folio Ink renders the panel in the dark appearance")
+    func inkRendersDark() throws {
+        let window = LauncherWindow()
+        window.present(model(theme: .folioInk), screenFrame: screen)
+        #expect(window.content.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        #expect(window.renderSnapshot(screenFrame: screen, scale: 1, backdrop: nil) != nil)
     }
 
     @Test("an empty model shows the empty text instead of rows")
@@ -213,17 +245,18 @@ struct LauncherWindowTests {
 
     private func twoSections() -> [SectionViewModel] {
         [
-            SectionViewModel(title: "favorites", rows: [
-                row("com.google.Chrome", "Google Chrome", hotkey: ["⌘", "1"], alias: "gc"),
+            SectionViewModel(title: "Favorites", rows: [
+                row("com.google.Chrome", "Google Chrome", hotkey: ["⌘1"], alias: "gc"),
             ]),
-            SectionViewModel(title: "results", rows: [
+            SectionViewModel(title: "Results", rows: [
                 row("com.apple.Safari", "Safari"),
-                row("com.tinyspeck.slackmacgap", "Slack", hotkey: ["⌥", "S"]),
+                row("com.tinyspeck.slackmacgap", "Slack", hotkey: ["⌥S"]),
             ]),
         ]
     }
 
     private func model(
+        theme: AppTheme = .folioPaper,
         query: String = "",
         arguments: [ArgumentFieldViewModel] = [],
         sections: [SectionViewModel]? = nil,
@@ -233,7 +266,7 @@ struct LauncherWindowTests {
         emptyText: String? = nil
     ) -> LauncherViewModel {
         LauncherViewModel(
-            theme: .missionControl,
+            theme: theme,
             query: query,
             placeholder: "Search for apps and commands…",
             arguments: arguments,

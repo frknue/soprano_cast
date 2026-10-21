@@ -52,7 +52,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         guard statusItem == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = Self.statusImage()
+        item.button?.image = CastGlyph.templateImage()
         item.button?.toolTip = "Soprano Cast"
         let menu = NSMenu()
         menu.delegate = self
@@ -231,28 +231,5 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
-    }
-
-    /// The 18 pt template icon: a square with a slanted beam cast through it.
-    static func statusImage() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            NSColor.black.set()
-            let square = NSBezierPath(rect: NSRect(x: 2.75, y: 2.75, width: 12.5, height: 12.5))
-            square.lineWidth = 1.5
-            square.stroke()
-
-            // The beam: a parallelogram from the lower left to the upper right corner.
-            let beam = NSBezierPath()
-            beam.move(to: NSPoint(x: 5, y: 4.5))
-            beam.line(to: NSPoint(x: 8, y: 4.5))
-            beam.line(to: NSPoint(x: 13, y: 13.5))
-            beam.line(to: NSPoint(x: 10, y: 13.5))
-            beam.close()
-            beam.fill()
-            return true
-        }
-        image.isTemplate = true
-        image.accessibilityDescription = "Soprano Cast"
-        return image
     }
 }

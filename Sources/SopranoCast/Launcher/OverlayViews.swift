@@ -4,36 +4,35 @@ import SopranoCastCore
 // What sits on top of Root Search: the ⌘K Action Panel, the hotkey recorder, the alias
 // editor and the confirmation (cards), and script output (in place of the list).
 
-/// A card: `bgPanel`, a `borderStrong` hairline, square corners and a drop shadow.
+/// A card (Folio `.menu` / `.dialog`): `raised`, a `borderSubtle` hairline, radius 10 and
+/// the e2 shadow.
 class LauncherCardView: LauncherFlippedView {
     func applyCardStyle(_ colors: ThemeColors) {
         guard let layer else { return }
-        layer.backgroundColor = colors.bgPanel.cgColor
-        layer.borderColor = colors.borderStrong.cgColor
-        layer.borderWidth = Retro.hairline
-        layer.cornerRadius = Retro.cornerRadius
-        layer.masksToBounds = false
-        layer.shadowColor = NSColor.black.cgColor
-        layer.shadowOpacity = 0.5
-        layer.shadowRadius = 12
-        layer.shadowOffset = CGSize(width: 0, height: -4)
+        layer.backgroundColor = colors.raised.cgColor
+        layer.cornerRadius = Chrome.Radius.popover
+        layer.cornerCurve = .continuous
+        colors.shadowE2.apply(to: layer)
+        layer.borderColor = colors.borderSubtle.cgColor
+        layer.borderWidth = Chrome.hairline
     }
 }
 
 // MARK: - Action Panel
 
-/// The ⌘K Action Panel (and Configure Command): a 360-wide card with the item title as
-/// heading, 32 pt action rows (keycaps right, destructive ones in `danger`), and the
-/// filter field at the bottom.
+/// The ⌘K Action Panel (and Configure Command): a 360-wide card with the item title as a
+/// meta heading, 30 pt action rows (K1 caps right, destructive ones in `danger`, the
+/// selected one a pill with the pencil tick), and the filter field at the bottom.
 final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
     static let width: CGFloat = 360
-    static let headingHeight: CGFloat = 30
-    static let rowHeight: CGFloat = 32
-    static let filterHeight: CGFloat = 40
-    static let listPadding: CGFloat = 4
-    static let horizontalInset: CGFloat = 12
-    static let placeholder = "search for actions…"
-    static let emptyText = "no results"
+    /// The card's inner padding (Folio `.menu`).
+    static let padding: CGFloat = 5
+    static let headingHeight: CGFloat = 24
+    static let rowHeight: CGFloat = 30
+    static let filterHeight: CGFloat = 36
+    static let horizontalInset: CGFloat = 13
+    static let placeholder = "Search for actions…"
+    static let emptyText = "No results"
 
     let filterField = LauncherText.inputField()
     /// The filter text changed.
@@ -47,11 +46,10 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
     private let emptyLabel = LauncherText.label()
     private let scrollView = NSScrollView()
     private let document = ActionListDocumentView()
-    private let filterRule = RetroRuleView(axis: .horizontal, style: .single)
+    private let filterRule = LauncherFlippedView()
     private var rowCount = 0
     private var selectedIndex: Int?
     private var hoveredIndex: Int?
-    private var colors = AppTheme.missionControl.colors
 
     init() {
         super.init(frame: .zero)
@@ -63,8 +61,7 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
         scrollView.contentView.drawsBackground = false
         scrollView.documentView = document
         document.onHover = { [weak self] index in self?.setHovered(index) }
-        filterRule.translatesAutoresizingMaskIntoConstraints = true
-        filterField.font = RetroFont.body(13)
+        filterField.font = ChromeFont.row
         filterField.delegate = self
         filterField.setAccessibilityLabel("Search for actions")
         emptyLabel.alignment = .center
@@ -86,9 +83,9 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
         rows: [ActionRowViewModel],
         selectedIndex: Int?,
         focused: Bool,
-        colors: ThemeColors
+        theme: AppTheme
     ) {
-        self.colors = colors
+        let colors = theme.colors
         applyCardStyle(colors)
         if rows.count != rowCount {
             hoveredIndex = nil
@@ -96,32 +93,27 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
         }
         rowCount = rows.count
         self.selectedIndex = selectedIndex
-        headingLabel.attributedStringValue = RetroText.display(title, color: colors.textMuted)
-        emptyLabel.attributedStringValue = RetroText.display(Self.emptyText, color: colors.textMuted, alignment: .center)
-        filterRule.color = colors.borderSubtle
-        filterField.textColor = colors.textPrimary
-        filterField.placeholderAttributedString = LauncherText.plain(
-            Self.placeholder, font: RetroFont.body(13), color: colors.textMuted
+        headingLabel.attributedStringValue = LauncherText.plain(title, font: ChromeFont.meta, color: colors.textMuted)
+        emptyLabel.attributedStringValue = LauncherText.plain(
+            Self.emptyText, font: ChromeFont.meta, color: colors.textMuted, alignment: .center
         )
+        filterRule.layer?.backgroundColor = colors.borderSubtle.cgColor
+        filterField.textColor = colors.textPrimary
+        filterField.placeholderAttributedString = LauncherText.plain(Self.placeholder, font: ChromeFont.row, color: colors.textMuted)
         LauncherText.sync(filterField, to: query)
         if focused {
-            (filterField.currentEditor() as? NSTextView)?.insertionPointColor = colors.accent
+            ChromeFieldView.styleEditor(of: filterField, colors: colors)
         }
 
         document.ensureRowCount(rows.count) { [weak self] row in
             row.onClick = { index in self?.onActionClick?(index) }
         }
-        let rowWidth = Self.width - Self.listPadding * 2
+        let rowWidth = Self.width - Self.padding * 2
         for (index, row) in rows.enumerated() {
             document.rows[index].configure(
                 row,
                 index: index,
-                frame: CGRect(
-                    x: Self.listPadding,
-                    y: Self.listPadding + CGFloat(index) * Self.rowHeight,
-                    width: rowWidth,
-                    height: Self.rowHeight
-                ),
+                frame: CGRect(x: Self.padding, y: CGFloat(index) * Self.rowHeight, width: rowWidth, height: Self.rowHeight),
                 isSelected: index == selectedIndex,
                 isHovered: index == hoveredIndex,
                 colors: colors
@@ -131,8 +123,8 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
 
     /// Heading, every row (at least one row's height for the empty text), the filter.
     func preferredHeight(maxHeight: CGFloat) -> CGFloat {
-        let listHeight = CGFloat(max(1, rowCount)) * Self.rowHeight + Self.listPadding * 2
-        return min(maxHeight, Self.headingHeight + listHeight + Retro.hairline + Self.filterHeight)
+        let listHeight = CGFloat(max(1, rowCount)) * Self.rowHeight
+        return min(maxHeight, Self.padding + Self.headingHeight + listHeight + Self.padding + Chrome.hairline + Self.filterHeight)
     }
 
     func layoutContents() {
@@ -140,42 +132,40 @@ final class ActionPanelView: LauncherCardView, NSTextFieldDelegate {
         headingLabel.frame = LauncherText.lineFrame(
             minX: Self.horizontalInset,
             maxX: width - Self.horizontalInset,
-            centerY: Self.headingHeight / 2 + 2,
-            font: RetroFont.display(11)
+            centerY: Self.padding + Self.headingHeight / 2,
+            font: ChromeFont.meta
         )
         let filterTop = bounds.height - Self.filterHeight
-        filterRule.frame = CGRect(x: 0, y: filterTop - Retro.hairline, width: width, height: Retro.hairline)
-        let fieldHeight = LauncherText.lineHeight(RetroFont.body(13)) + 2
+        filterRule.frame = CGRect(x: 0, y: filterTop - Chrome.hairline, width: width, height: Chrome.hairline)
+        let fieldHeight = LauncherText.lineHeight(ChromeFont.row) + 2
         filterField.frame = CGRect(
             x: Self.horizontalInset,
             y: (filterTop + (Self.filterHeight - fieldHeight) / 2).rounded(),
             width: width - Self.horizontalInset * 2,
             height: fieldHeight
         )
+        let listTop = Self.padding + Self.headingHeight
         let listFrame = CGRect(
             x: 0,
-            y: Self.headingHeight,
+            y: listTop,
             width: width,
-            height: max(0, filterTop - Retro.hairline - Self.headingHeight)
+            height: max(0, filterTop - Chrome.hairline - Self.padding - listTop)
         )
         scrollView.frame = listFrame
-        document.setFrameSize(NSSize(
-            width: width,
-            height: max(CGFloat(rowCount) * Self.rowHeight + Self.listPadding * 2, listFrame.height)
-        ))
+        document.setFrameSize(NSSize(width: width, height: max(CGFloat(rowCount) * Self.rowHeight, listFrame.height)))
         emptyLabel.isHidden = rowCount > 0
         emptyLabel.frame = LauncherText.lineFrame(
             minX: Self.horizontalInset,
             maxX: width - Self.horizontalInset,
             centerY: listFrame.midY,
-            font: RetroFont.display(11)
+            font: ChromeFont.meta
         )
     }
 
     /// Keeps the selected action whole in view.
     func scrollSelectionIntoView() {
         guard let selected = selectedIndex, rowViews.indices.contains(selected) else { return }
-        let frame = rowViews[selected].frame.insetBy(dx: 0, dy: -Self.listPadding)
+        let frame = rowViews[selected].frame
         let visible = scrollView.contentView.bounds
         guard frame.minY < visible.minY || frame.maxY > visible.maxY else { return }
         let y = frame.minY < visible.minY ? frame.minY : frame.maxY - visible.height
@@ -226,11 +216,12 @@ final class ActionListDocumentView: HoverContainerView {
     }
 }
 
-/// One action: title (body 13, `danger` when destructive) and its shortcut keycaps right;
-/// the selected one gets `bgSelectedStrong` and the `accent` rail.
+/// One action (Folio `.menu-row`): SF 13 title (`danger` when destructive) and its K1
+/// caps right; the selected one is the selection pill with the pencil tick.
 final class ActionRowView: LauncherFlippedView {
-    static let horizontalInset: CGFloat = 10
-    static let keycapHeight: CGFloat = 18
+    static let leadingInset: CGFloat = 10
+    static let trailingInset: CGFloat = 8
+    static let keycapHeight: CGFloat = Chrome.keycapHeight
 
     private(set) var index = 0
     private(set) var title = ""
@@ -240,15 +231,13 @@ final class ActionRowView: LauncherFlippedView {
 
     private let titleLabel = LauncherText.label()
     private let keycaps = KeycapRowView()
-    private let rail = LauncherFlippedView()
-    private var colors = AppTheme.missionControl.colors
+    private var colors = AppTheme.folioPaper.colors
 
     init() {
         super.init(frame: .zero)
         titleLabel.setAccessibilityElement(false)
         addSubview(titleLabel)
         addSubview(keycaps)
-        addSubview(rail)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
     }
@@ -273,12 +262,10 @@ final class ActionRowView: LauncherFlippedView {
         self.isHovered = isHovered
         self.frame = frame
         titleLabel.attributedStringValue = LauncherText.plain(
-            row.title, font: RetroFont.body(13), color: row.isDestructive ? colors.danger : colors.textPrimary
+            row.title, font: ChromeFont.row, color: row.isDestructive ? colors.danger : colors.textPrimary
         )
-        if row.keys != keycaps.keys {
-            keycaps.configure(keys: row.keys, fontSize: RetroFont.grid, height: Self.keycapHeight, colors: colors)
-        }
-        applyState()
+        keycaps.configure(keys: row.keys, colors: colors)
+        needsDisplay = true
         layoutContents()
         setAccessibilityLabel(row.title)
         setAccessibilitySelected(isSelected)
@@ -286,20 +273,17 @@ final class ActionRowView: LauncherFlippedView {
 
     func setHovered(_ hovered: Bool) {
         isHovered = hovered
-        applyState()
+        needsDisplay = true
     }
 
-    private func applyState() {
-        let fill: NSColor = isSelected ? colors.bgSelectedStrong : (isHovered ? colors.bgOverlay : .clear)
-        layer?.backgroundColor = fill.cgColor
-        rail.isHidden = !isSelected
-        rail.layer?.backgroundColor = colors.accent.cgColor
+    override func draw(_ dirtyRect: NSRect) {
+        let style: ChromeSelectionPill.Style = isSelected ? .selected : (isHovered ? .hover : .none)
+        ChromeSelectionPill.draw(style, in: bounds, colors: colors, inset: 0)
     }
 
     private func layoutContents() {
         let centerY = bounds.height / 2
-        rail.frame = CGRect(x: 0, y: 0, width: ResultRowView.railWidth, height: bounds.height)
-        var trailing = bounds.width - Self.horizontalInset
+        var trailing = bounds.width - Self.trailingInset
         keycaps.isHidden = keycaps.keys.isEmpty
         if !keycaps.keys.isEmpty {
             keycaps.frame = CGRect(
@@ -309,10 +293,10 @@ final class ActionRowView: LauncherFlippedView {
                 height: Self.keycapHeight
             )
             keycaps.layoutCaps()
-            trailing = keycaps.frame.minX - 8
+            trailing = keycaps.frame.minX - 10
         }
         titleLabel.frame = LauncherText.lineFrame(
-            minX: Self.horizontalInset, maxX: trailing, centerY: centerY, font: RetroFont.body(13)
+            minX: Self.leadingInset, maxX: trailing, centerY: centerY, font: ChromeFont.row
         )
     }
 
@@ -332,22 +316,75 @@ final class ActionRowView: LauncherFlippedView {
     }
 }
 
+// MARK: - Hint row
+
+/// Hints (Folio `.hints`): small muted caps, each followed by its word, centered.
+final class HintRowView: LauncherFlippedView {
+    static let capGap: CGFloat = 5
+    static let hintGap: CGFloat = 14
+
+    private var caps: [KeycapRowView] = []
+    private var labels: [NSTextField] = []
+    private(set) var hints: [RecorderHint] = []
+
+    func configure(_ hints: [RecorderHint], colors: ThemeColors) {
+        self.hints = hints
+        while caps.count > hints.count {
+            caps.removeLast().removeFromSuperview()
+            labels.removeLast().removeFromSuperview()
+        }
+        while caps.count < hints.count {
+            let cap = KeycapRowView()
+            let label = LauncherText.label()
+            addSubview(cap)
+            addSubview(label)
+            caps.append(cap)
+            labels.append(label)
+        }
+        for (index, hint) in hints.enumerated() {
+            caps[index].configure(keys: hint.caps, style: .small, muted: true, colors: colors)
+            labels[index].attributedStringValue = LauncherText.plain(hint.label, font: ChromeFont.meta, color: colors.textMuted)
+        }
+        setAccessibilityLabel(hints.map { "\($0.caps.joined(separator: " ")) \($0.label)" }.joined(separator: ", "))
+    }
+
+    func layoutHints() {
+        let widths = zip(caps, labels).map { cap, label in
+            cap.preferredWidth + Self.capGap + LauncherText.width(of: label.attributedStringValue)
+        }
+        let total = widths.reduce(0, +) + Self.hintGap * CGFloat(max(0, widths.count - 1))
+        var x = ((bounds.width - total) / 2).rounded()
+        let centerY = bounds.height / 2
+        for (index, cap) in caps.enumerated() {
+            let height = LauncherKeycapStyle.small.height
+            cap.frame = CGRect(x: x, y: (centerY - height / 2).rounded(), width: cap.preferredWidth, height: height)
+            cap.layoutCaps()
+            let labelX = cap.frame.maxX + Self.capGap
+            let labelWidth = LauncherText.width(of: labels[index].attributedStringValue)
+            labels[index].frame = LauncherText.lineFrame(minX: labelX, maxX: labelX + labelWidth, centerY: centerY, font: ChromeFont.meta)
+            x = labelX + labelWidth + Self.hintGap
+        }
+    }
+}
+
 // MARK: - Hotkey recorder
 
-/// The hotkey recorder: the item title, the keys so far as display-22 keycaps, the
-/// conflicting owner in `danger`, a 2 pt `accent` countdown bar and the hint line.
+/// The hotkey recorder (Folio `.dialog` with `.kbd-lg` caps): the item title as a New York
+/// headline, the keys so far as 36 pt caps (or "Recording…" in italic serif), the
+/// conflicting owner in `danger`, a 2 pt `textMuted` countdown bar and the key hints.
 final class RecorderCardView: LauncherCardView {
     static let width: CGFloat = 380
     static let padding: CGFloat = 20
+    static let titleSlot: CGFloat = 22
     static let lineSlot: CGFloat = 16
-    static let keycapHeight: CGFloat = 40
+    static let keycapHeight: CGFloat = LauncherKeycapStyle.large.height
     static let barHeight: CGFloat = 2
-    static let recordingText = "recording…"
+    static let recordingText = "Recording…"
 
     static func size() -> CGSize {
         CGSize(
             width: width,
-            height: padding + lineSlot + 16 + keycapHeight + 12 + lineSlot + 12 + barHeight + 14 + lineSlot + padding
+            height: padding + titleSlot + 14 + keycapHeight + 10 + lineSlot + 10 + barHeight + 14 + lineSlot + padding
         )
     }
 
@@ -356,7 +393,7 @@ final class RecorderCardView: LauncherCardView {
     private let recordingLabel = LauncherText.label()
     private let conflictLabel = LauncherText.label()
     private let countdownBar = LauncherFlippedView()
-    private let hintLabel = LauncherText.label()
+    private let hintRow = HintRowView()
     private var countdown: Double?
 
     /// The keycaps showing, for tests.
@@ -366,10 +403,10 @@ final class RecorderCardView: LauncherCardView {
 
     init() {
         super.init(frame: .zero)
-        for label in [titleLabel, recordingLabel, conflictLabel, hintLabel] {
+        for label in [titleLabel, recordingLabel, conflictLabel] {
             label.alignment = .center
         }
-        for view: NSView in [titleLabel, keycaps, recordingLabel, conflictLabel, countdownBar, hintLabel] {
+        for view: NSView in [titleLabel, keycaps, recordingLabel, conflictLabel, countdownBar, hintRow] {
             addSubview(view)
         }
         setAccessibilityRole(.group)
@@ -381,19 +418,19 @@ final class RecorderCardView: LauncherCardView {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(itemTitle: String, keys: [String], conflict: String?, countdown: Double?, hint: String, colors: ThemeColors) {
+    func configure(itemTitle: String, keys: [String], conflict: String?, countdown: Double?, hints: [RecorderHint], theme: AppTheme) {
+        let colors = theme.colors
         applyCardStyle(colors)
         self.countdown = countdown
-        titleLabel.attributedStringValue = RetroText.display(itemTitle, color: colors.textPrimary, alignment: .center)
-        if keys != keycaps.keys {
-            keycaps.configure(keys: keys, fontSize: 22, height: Self.keycapHeight, colors: colors)
-        }
-        recordingLabel.attributedStringValue = RetroText.display(
-            Self.recordingText, color: colors.textMuted, size: 22, alignment: .center
+        titleLabel.attributedStringValue = LauncherText.plain(itemTitle, font: ChromeFont.headline, color: colors.textPrimary, alignment: .center)
+        keycaps.configure(keys: keys, style: .large, colors: colors)
+        recordingLabel.attributedStringValue = LauncherText.plain(
+            Self.recordingText, font: ChromeFont.empty, color: colors.textMuted, alignment: .center
         )
-        conflictLabel.attributedStringValue = RetroText.display(conflict ?? "", color: colors.danger, alignment: .center)
-        countdownBar.layer?.backgroundColor = colors.accent.cgColor
-        hintLabel.attributedStringValue = RetroText.display(hint, color: colors.textMuted, alignment: .center)
+        conflictLabel.attributedStringValue = LauncherText.plain(conflict ?? "", font: ChromeFont.label, color: colors.danger, alignment: .center)
+        countdownBar.layer?.backgroundColor = colors.textMuted.cgColor
+        countdownBar.layer?.cornerRadius = 1
+        hintRow.configure(hints, colors: colors)
     }
 
     func layoutContents() {
@@ -401,8 +438,8 @@ final class RecorderCardView: LauncherCardView {
         let minX = Self.padding
         let maxX = width - Self.padding
         var y = Self.padding
-        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
-        y += Self.lineSlot + 16
+        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.titleSlot / 2, font: ChromeFont.headline)
+        y += Self.titleSlot + 14
 
         let hasKeys = !keycaps.keys.isEmpty
         keycaps.isHidden = !hasKeys
@@ -413,41 +450,41 @@ final class RecorderCardView: LauncherCardView {
             keycaps.layoutCaps()
         } else {
             recordingLabel.frame = LauncherText.lineFrame(
-                minX: minX, maxX: maxX, centerY: y + Self.keycapHeight / 2, font: RetroFont.display(22)
+                minX: minX, maxX: maxX, centerY: y + Self.keycapHeight / 2, font: ChromeFont.empty
             )
         }
-        y += Self.keycapHeight + 12
+        y += Self.keycapHeight + 10
 
-        conflictLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
+        conflictLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: ChromeFont.label)
         conflictLabel.isHidden = conflictLabel.attributedStringValue.length == 0
-        y += Self.lineSlot + 12
+        y += Self.lineSlot + 10
 
-        if let countdown {
-            let progress = CGFloat(min(max(countdown, 0), 1))
-            countdownBar.isHidden = false
-            countdownBar.frame = CGRect(x: minX, y: y, width: ((maxX - minX) * progress).rounded(), height: Self.barHeight)
-        } else {
-            countdownBar.isHidden = true
-        }
+        let progress = countdown.map { CGFloat(min(max($0, 0), 1)) } ?? 0
+        let barWidth = ((maxX - minX) * progress).rounded()
+        // Nothing at 0: a zero-width bar would still show its rounded ends.
+        countdownBar.isHidden = barWidth < 1
+        countdownBar.frame = CGRect(x: minX, y: y, width: barWidth, height: Self.barHeight)
         y += Self.barHeight + 14
 
-        hintLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
+        hintRow.frame = CGRect(x: minX, y: y, width: maxX - minX, height: Self.lineSlot)
+        hintRow.layoutHints()
     }
 }
 
 // MARK: - Alias editor
 
-/// The alias editor: the item title, a bordered body-14 field (framed in `accent` while
-/// focused) and the validation error in `danger`.
+/// The alias editor (Folio `.dialog`): the item title as a headline, a `.field` (its edge
+/// darkens to `fieldFocusEdge` while focused) and the validation error in `danger`.
 final class AliasEditorCardView: LauncherCardView, NSTextFieldDelegate {
     static let width: CGFloat = 380
     static let padding: CGFloat = 20
+    static let titleSlot: CGFloat = 22
     static let lineSlot: CGFloat = 16
-    static let fieldBoxHeight: CGFloat = 32
+    static let fieldBoxHeight: CGFloat = Chrome.fieldHeight
     static let placeholder = "alias"
 
     static func size() -> CGSize {
-        CGSize(width: width, height: padding + lineSlot + 12 + fieldBoxHeight + 10 + lineSlot + padding)
+        CGSize(width: width, height: padding + titleSlot + 12 + fieldBoxHeight + 8 + lineSlot + padding)
     }
 
     let field = LauncherText.inputField()
@@ -460,7 +497,7 @@ final class AliasEditorCardView: LauncherCardView, NSTextFieldDelegate {
 
     init() {
         super.init(frame: .zero)
-        field.font = RetroFont.body(14)
+        field.font = ChromeFont.row
         field.delegate = self
         field.setAccessibilityLabel("Alias")
         fieldBox.addSubview(field)
@@ -476,19 +513,21 @@ final class AliasEditorCardView: LauncherCardView, NSTextFieldDelegate {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(itemTitle: String, text: String, error: String?, focused: Bool, colors: ThemeColors) {
+    func configure(itemTitle: String, text: String, error: String?, focused: Bool, theme: AppTheme) {
+        let colors = theme.colors
         applyCardStyle(colors)
-        titleLabel.attributedStringValue = RetroText.display(itemTitle, color: colors.textPrimary)
-        fieldBox.layer?.backgroundColor = colors.bgRaised.cgColor
-        fieldBox.layer?.borderColor = (focused ? colors.accent : colors.borderSubtle).cgColor
-        fieldBox.layer?.borderWidth = Retro.hairline
+        titleLabel.attributedStringValue = LauncherText.plain(itemTitle, font: ChromeFont.headline, color: colors.textPrimary)
+        fieldBox.layer?.backgroundColor = colors.raised.cgColor
+        fieldBox.layer?.borderColor = (error != nil ? colors.danger : (focused ? colors.fieldFocusEdge : colors.borderStrong)).cgColor
+        fieldBox.layer?.borderWidth = Chrome.hairline
+        fieldBox.layer?.cornerRadius = Chrome.Radius.control
         field.textColor = colors.textPrimary
-        field.placeholderAttributedString = LauncherText.plain(Self.placeholder, font: RetroFont.body(14), color: colors.textMuted)
+        field.placeholderAttributedString = LauncherText.plain(Self.placeholder, font: ChromeFont.row, color: colors.textMuted)
         LauncherText.sync(field, to: text)
         if focused {
-            (field.currentEditor() as? NSTextView)?.insertionPointColor = colors.accent
+            ChromeFieldView.styleEditor(of: field, colors: colors)
         }
-        errorLabel.attributedStringValue = RetroText.display(error ?? "", color: colors.danger)
+        errorLabel.attributedStringValue = LauncherText.plain(error ?? "", font: ChromeFont.label, color: colors.danger)
         errorLabel.isHidden = error == nil
     }
 
@@ -496,18 +535,18 @@ final class AliasEditorCardView: LauncherCardView, NSTextFieldDelegate {
         let minX = Self.padding
         let maxX = bounds.width - Self.padding
         var y = Self.padding
-        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
-        y += Self.lineSlot + 12
+        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.titleSlot / 2, font: ChromeFont.headline)
+        y += Self.titleSlot + 12
         fieldBox.frame = CGRect(x: minX, y: y, width: maxX - minX, height: Self.fieldBoxHeight)
-        let fieldHeight = LauncherText.lineHeight(RetroFont.body(14)) + 2
+        let fieldHeight = LauncherText.lineHeight(ChromeFont.row) + 2
         field.frame = CGRect(
             x: 8,
             y: ((Self.fieldBoxHeight - fieldHeight) / 2).rounded(),
             width: max(0, fieldBox.bounds.width - 16),
             height: fieldHeight
         )
-        y += Self.fieldBoxHeight + 10
-        errorLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
+        y += Self.fieldBoxHeight + 8
+        errorLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: ChromeFont.label)
     }
 
     func controlTextDidChange(_ notification: Notification) {
@@ -521,12 +560,13 @@ final class AliasEditorCardView: LauncherCardView, NSTextFieldDelegate {
 
 // MARK: - Confirmation
 
-/// "Are you sure?": the title, the message, and "cancel ⎋" / "<confirm> ↵" console keys.
-/// Every confirmation guards a destructive command, so the confirm key is lit in `danger`.
+/// "Are you sure?" (Folio `.dialog`): the title as a headline, the message (SF 13 muted),
+/// and the Cancel (`esc`) and confirm (`↵`) buttons. Every confirmation guards a
+/// destructive command, so the confirm button is the danger button.
 final class ConfirmationCardView: LauncherCardView {
     static let width: CGFloat = 400
     static let padding: CGFloat = 20
-    static let lineSlot: CGFloat = 16
+    static let titleSlot: CGFloat = 22
     static let buttonGap: CGFloat = 8
 
     var onCancel: (() -> Void)?
@@ -534,16 +574,14 @@ final class ConfirmationCardView: LauncherCardView {
 
     private let titleLabel = LauncherText.label()
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
-    private let cancelButton: RetroButton
-    private let confirmButton: RetroButton
+    private let cancelButton = ChromeButton(title: "Cancel", theme: .folioPaper, kind: .standard, keycap: "esc")
+    private let confirmButton = ChromeButton(title: "", theme: .folioPaper, kind: .danger, keycap: "↵")
     private var messageHeight: CGFloat = 0
 
-    /// The confirm key's title, for tests.
+    /// The confirm button's title, for tests.
     var confirmButtonTitle: String { confirmButton.title }
 
     init() {
-        cancelButton = RetroButton(title: "cancel ⎋", theme: .missionControl)
-        confirmButton = RetroButton(title: "", theme: .missionControl, kind: .prominent)
         super.init(frame: .zero)
         messageLabel.translatesAutoresizingMaskIntoConstraints = true
         for button in [cancelButton, confirmButton] {
@@ -567,8 +605,13 @@ final class ConfirmationCardView: LauncherCardView {
     func configure(title: String, message: String, confirmTitle: String, theme: AppTheme) {
         let colors = theme.colors
         applyCardStyle(colors)
-        titleLabel.attributedStringValue = RetroText.display(title, color: colors.textPrimary)
-        let messageText = LauncherText.plain(message, font: RetroFont.body(13), color: colors.textMuted, lineBreakMode: .byWordWrapping)
+        titleLabel.attributedStringValue = LauncherText.plain(title, font: ChromeFont.headline, color: colors.textPrimary)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.minimumLineHeight = 19
+        let messageText = NSAttributedString(string: message, attributes: [
+            .font: ChromeFont.row, .foregroundColor: colors.textMuted, .paragraphStyle: paragraph,
+        ])
         messageLabel.attributedStringValue = messageText
         let textWidth = Self.width - Self.padding * 2
         messageHeight = message.isEmpty ? 0 : ceil(messageText.boundingRect(
@@ -576,15 +619,15 @@ final class ConfirmationCardView: LauncherCardView {
             options: [.usesLineFragmentOrigin, .usesFontLeading]
         ).height) + 2
         cancelButton.apply(theme: theme)
-        confirmButton.apply(theme: Self.dangerTheme(theme))
-        confirmButton.title = "\(confirmTitle) ↵"
+        confirmButton.apply(theme: theme)
+        confirmButton.title = confirmTitle
     }
 
     func preferredSize() -> CGSize {
-        let messageBlock = messageHeight > 0 ? messageHeight + 10 : 0
+        let messageBlock = messageHeight > 0 ? messageHeight + 8 : 0
         return CGSize(
             width: Self.width,
-            height: Self.padding + Self.lineSlot + 10 + messageBlock + 8 + Retro.controlHeight + Self.padding
+            height: Self.padding + Self.titleSlot + 8 + messageBlock + 8 + Chrome.controlHeight + Self.padding - 4
         )
     }
 
@@ -592,22 +635,22 @@ final class ConfirmationCardView: LauncherCardView {
         let minX = Self.padding
         let maxX = bounds.width - Self.padding
         var y = Self.padding
-        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.lineSlot / 2, font: RetroFont.display(11))
-        y += Self.lineSlot + 10
+        titleLabel.frame = LauncherText.lineFrame(minX: minX, maxX: maxX, centerY: y + Self.titleSlot / 2, font: ChromeFont.headline)
+        y += Self.titleSlot + 8
         messageLabel.isHidden = messageHeight == 0
         messageLabel.frame = CGRect(x: minX, y: y, width: maxX - minX, height: messageHeight)
         if messageHeight > 0 {
-            y += messageHeight + 10
+            y += messageHeight + 8
         }
         y += 8
         let confirmWidth = confirmButton.intrinsicContentSize.width
         let cancelWidth = cancelButton.intrinsicContentSize.width
-        confirmButton.frame = CGRect(x: maxX - confirmWidth, y: y, width: confirmWidth, height: Retro.controlHeight)
+        confirmButton.frame = CGRect(x: maxX - confirmWidth, y: y, width: confirmWidth, height: Chrome.controlHeight)
         cancelButton.frame = CGRect(
             x: confirmButton.frame.minX - Self.buttonGap - cancelWidth,
             y: y,
             width: cancelWidth,
-            height: Retro.controlHeight
+            height: Chrome.controlHeight
         )
     }
 
@@ -618,48 +661,21 @@ final class ConfirmationCardView: LauncherCardView {
     @objc private func confirmClicked() {
         onConfirm?()
     }
-
-    /// `theme` with `danger` as its accent: a prominent `RetroButton` lights in it.
-    static func dangerTheme(_ theme: AppTheme) -> AppTheme {
-        let colors = theme.colors
-        return AppTheme(
-            id: "\(theme.id)-danger",
-            name: theme.name,
-            colors: ThemeColors(
-                bgBase: colors.bgBase,
-                bgPanel: colors.bgPanel,
-                bgRaised: colors.bgRaised,
-                bgOverlay: colors.bgOverlay,
-                textPrimary: colors.textPrimary,
-                textMuted: colors.textMuted,
-                accent: colors.danger,
-                accentStrong: colors.danger,
-                borderSubtle: colors.borderSubtle,
-                borderStrong: colors.borderStrong,
-                success: colors.success,
-                danger: colors.danger,
-                blue: colors.blue,
-                cyan: colors.cyan,
-                yellow: colors.yellow,
-                gray: colors.gray
-            ),
-            terminalColors: theme.terminalColors
-        )
-    }
 }
 
 // MARK: - Output
 
-/// Script output (fullOutput mode) in place of the list: a title row over a selectable,
-/// monospace body-12 text view.
+/// Script output (fullOutput mode) in place of the list: an SF 13 Medium title row over a
+/// selectable SF Mono 12 text view.
 final class OutputView: LauncherFlippedView {
     static let titleHeight: CGFloat = 36
-    static let horizontalInset: CGFloat = 16
+    static let horizontalInset: CGFloat = 20
+    static let titleFont = ChromeFont.sans(size: 13, weight: .medium)
 
     let textView: NSTextView
     private let scrollView = NSScrollView()
     private let titleLabel = LauncherText.label()
-    private let rule = RetroRuleView(axis: .horizontal, style: .single)
+    private let rule = LauncherFlippedView()
 
     /// The text showing.
     var text: String { textView.string }
@@ -671,7 +687,7 @@ final class OutputView: LauncherFlippedView {
         textView.isSelectable = true
         textView.isRichText = false
         textView.drawsBackground = false
-        textView.font = RetroFont.body(12)
+        textView.font = ChromeFont.mono
         textView.textContainerInset = NSSize(width: Self.horizontalInset - 5, height: 10)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -685,7 +701,6 @@ final class OutputView: LauncherFlippedView {
         scrollView.scrollerStyle = .overlay
         scrollView.contentView.drawsBackground = false
         scrollView.documentView = textView
-        rule.translatesAutoresizingMaskIntoConstraints = true
         for view: NSView in [titleLabel, rule, scrollView] {
             addSubview(view)
         }
@@ -696,16 +711,22 @@ final class OutputView: LauncherFlippedView {
         fatalError("init(coder:) is not supported")
     }
 
-    func configure(title: String, text: String, isError: Bool, colors: ThemeColors) {
-        titleLabel.attributedStringValue = RetroText.display(title, color: isError ? colors.danger : colors.textPrimary)
-        rule.color = colors.borderSubtle
+    func configure(title: String, text: String, isError: Bool, theme: AppTheme) {
+        let colors = theme.colors
+        titleLabel.attributedStringValue = LauncherText.plain(title, font: Self.titleFont, color: isError ? colors.danger : colors.textPrimary)
+        rule.layer?.backgroundColor = colors.borderSubtle.cgColor
         textView.textColor = colors.textPrimary
-        textView.insertionPointColor = colors.accent
-        textView.selectedTextAttributes = [.backgroundColor: colors.bgSelectedStrong]
+        textView.insertionPointColor = colors.caret
+        textView.selectedTextAttributes = [.backgroundColor: colors.textSelection]
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = 18
+        paragraph.maximumLineHeight = 18
+        textView.defaultParagraphStyle = paragraph
         if textView.string != text {
             textView.string = text
             textView.textColor = colors.textPrimary
-            textView.font = RetroFont.body(12)
+            textView.font = ChromeFont.mono
+            textView.textStorage?.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: (text as NSString).length))
             textView.scroll(.zero)
         }
     }
@@ -715,10 +736,10 @@ final class OutputView: LauncherFlippedView {
             minX: Self.horizontalInset,
             maxX: bounds.width - Self.horizontalInset,
             centerY: Self.titleHeight / 2,
-            font: RetroFont.display(11)
+            font: Self.titleFont
         )
-        rule.frame = CGRect(x: 0, y: Self.titleHeight, width: bounds.width, height: Retro.hairline)
-        let top = Self.titleHeight + Retro.hairline
+        rule.frame = CGRect(x: 0, y: Self.titleHeight, width: bounds.width, height: Chrome.hairline)
+        let top = Self.titleHeight + Chrome.hairline
         scrollView.frame = CGRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
         let contentWidth = scrollView.contentSize.width
         if textView.frame.width != contentWidth {

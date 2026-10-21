@@ -23,17 +23,33 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
     private enum Column: String, CaseIterable {
         case name, type, alias, hotkey, enabled
 
-        var title: String { rawValue }
+        /// Sentence case; the header sets it in capitals.
+        var title: String {
+            switch self {
+            case .name: "Name"
+            case .type: "Type"
+            case .alias: "Alias"
+            case .hotkey: "Hotkey"
+            case .enabled: "Enabled"
+            }
+        }
+        /// Each column after Name carries the 12 pt gap before it (`.table` column-gap);
+        /// Enabled also carries the table's 12 pt trailing padding.
         var width: CGFloat {
             switch self {
             case .name: 220
-            case .type: 120
-            case .alias: 76
-            case .hotkey: 108
-            case .enabled: 56
+            case .type: 12 + 120
+            case .alias: 12 + 76
+            case .hotkey: 12 + 108
+            case .enabled: 12 + 56 + 12
             }
         }
     }
+
+    /// Leading padding of the table's first column (`.table-head` / `.table-group`).
+    static let tableLeading: CGFloat = 16
+    /// The gap before every other column.
+    static let columnGap: CGFloat = 12
 
     static let detailWidth: CGFloat = 320
     /// Pop-ups and fields in the detail pane, leaving their labels room.
@@ -52,13 +68,18 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
     ]
 
     private let topBar = LayerView()
-    private let filterField = NSTextField(string: "")
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let filterField = SettingsField(theme: AppTheme.folioPaper, placeholder: "search commands…", symbolName: "magnifyingglass")
     private let countLabel = NSTextField(labelWithString: "")
     private let header = ExtensionsHeaderView()
     private let scrollView = NSScrollView()
-    private let table = NSTableView()
-    private let rule = RetroRuleView(axis: .vertical, style: .single)
-    private let detail = SettingsScrollColumn(maxWidth: 10_000)
+    private let table = ExtensionsTableView()
+    private let rule = ChromeRuleView(axis: .vertical)
+    private let detail = SettingsScrollColumn(
+        maxWidth: 10_000,
+        spacing: 20,
+        insets: NSEdgeInsets(top: 16, left: 20, bottom: 16, right: 20)
+    )
 
     private var lines: [Line] = []
     private var collapsed: Set<ExtensionGroup> = []
@@ -107,12 +128,30 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
 
     /// Lays the table out so an offscreen render draws its rows.
     func prepareForRender() {
+        layoutSubtreeIfNeeded()
+        fitNameColumn()
         table.tile()
         if let row = selectedLineIndex {
             table.scrollRowToVisible(row)
         }
         scrollView.layoutSubtreeIfNeeded()
         table.layoutSubtreeIfNeeded()
+    }
+
+    override func layout() {
+        super.layout()
+        fitNameColumn()
+    }
+
+    /// Name takes what the fixed columns leave of the visible width, so Enabled never
+    /// slides under the scroller or past the splitter.
+    private func fitNameColumn() {
+        guard let name = table.tableColumns.first else { return }
+        let fixed = Column.allCases.dropFirst().reduce(0) { $0 + $1.width }
+        let width = max(name.minWidth, scrollView.contentSize.width - fixed)
+        if abs(name.width - width) >= 0.5 {
+            name.width = width
+        }
     }
 
     /// Shows `selection` in the table (expanding its group, clearing a filter that hides it)
@@ -150,6 +189,15 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         }
     }
 
+    /// The commands table, for tests (focus and hover).
+    var tableView: ExtensionsTableView { table }
+
+    /// The pill the row of `id` draws (nil when it is not laid out), for tests.
+    func pillStyle(of id: String) -> ChromeSelectionPill.Style? {
+        guard let index = listedIDs.firstIndex(of: id) else { return nil }
+        return (table.rowView(atRow: index, makeIfNecessary: true) as? ExtensionsRowView)?.pillStyle
+    }
+
     private var selectedLineIndex: Int? {
         guard let selection else { return nil }
         return lines.firstIndex { line in
@@ -174,10 +222,10 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
             return [.group(section)] + (isCollapsed ? [] : section.rows.map(Line.item))
         }
         let commands = sections.reduce(0) { $0 + $1.rows.count }
-        countLabel.attributedStringValue = RetroText.display(
+        countLabel.setChromeText(
             "\(commands) \(commands == 1 ? "command" : "commands")",
-            color: host.theme.colors.textMuted,
-            alignment: .right
+            font: ChromeFont.count,
+            color: host.theme.colors.textMuted
         )
         isReloadingTable = true
         table.reloadData()
@@ -209,6 +257,7 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         let view = ExtensionsRowView()
         view.colors = host?.theme.colors
+        view.isHovered = row == table.hoveredRow
         return view
     }
 
@@ -235,7 +284,7 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
             let icon = NSImageView()
             icon.image = icons.image(for: row.item.icon, size: 18)
             icon.imageScaling = .scaleProportionallyUpOrDown
-            let title = chrome.lineLabel(row.item.title, color: row.isEnabled ? colors.textPrimary : colors.textMuted, size: 13)
+            let title = chrome.lineLabel(row.item.title, color: row.isEnabled ? colors.textPrimary : colors.textMuted, font: ChromeFont.row)
             let stack = chrome.hstack([icon, title], spacing: 8)
             icon.widthAnchor.constraint(equalToConstant: 18).isActive = true
             icon.heightAnchor.constraint(equalToConstant: 18).isActive = true
@@ -243,36 +292,36 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         case .type:
             content = chrome.lineLabel(row.typeLabel, color: colors.textMuted)
         case .alias:
-            let field = NSTextField(string: row.alias ?? "")
-            field.isBordered = false
-            field.drawsBackground = false
-            field.focusRingType = .none
-            field.font = RetroFont.body(12)
-            field.textColor = colors.accent
+            let field = SettingsTextField(string: row.alias ?? "")
+            ChromeFieldView.styleEmbedded(field, colors: colors)
+            field.colors = colors
+            field.textColor = colors.textMuted
             field.isEditable = true
             field.delegate = self
             field.tag = index
             field.lineBreakMode = .byTruncatingTail
             field.cell?.usesSingleLineMode = true
-            field.placeholderAttributedString = NSAttributedString(
-                string: isSelected ? "add alias" : "",
-                attributes: [.font: RetroFont.body(12), .foregroundColor: colors.textMuted]
+            field.placeholderAttributedString = ChromeText.attributed(
+                isSelected ? "add alias" : "",
+                font: ChromeFont.label,
+                color: colors.textMuted
             )
             field.setAccessibilityLabel("Alias of \(row.item.title)")
             content = field
         case .hotkey:
             let button = HotkeyButton(
-                keycaps: row.hotkey.map(KeyboardLayout.keycaps(for:)) ?? [],
+                keycaps: row.hotkey.map(KeyboardLayout.caps(for:)) ?? [],
                 theme: chrome.theme,
+                style: .small,
                 target: self,
                 action: #selector(recordRowHotkey(_:))
             )
             button.tag = index
-            button.placeholder = "record"
+            button.placeholder = "Record"
             button.showsPlaceholder = isSelected
             content = button
         case .enabled:
-            let box = chrome.checkbox(isOn: row.isEnabled, accessibilityLabel: "Show \(row.item.title) in Root Search", target: self, action: #selector(enabledChanged(_:)))
+            let box = chrome.tableCheckbox(isOn: row.isEnabled, accessibilityLabel: "Show \(row.item.title) in Root Search", target: self, action: #selector(enabledChanged(_:)))
             box.tag = index
             content = box
         }
@@ -282,18 +331,18 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         switch column {
         case .enabled:
             constraints.append(content.centerXAnchor.constraint(equalTo: container.centerXAnchor))
-        case .hotkey:
+        case .name:
             constraints += [
-                content.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
-                content.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 4),
+                content.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Self.tableLeading),
+                content.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
             ]
-        default:
+        case .type, .alias, .hotkey:
             constraints += [
-                content.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: column == .name ? 14 : 6),
-                content.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -6),
+                content.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: Self.columnGap),
+                content.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
             ]
             if column == .alias {
-                constraints.append(content.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6))
+                constraints.append(content.trailingAnchor.constraint(equalTo: container.trailingAnchor))
             }
         }
         NSLayoutConstraint.activate(constraints)
@@ -322,12 +371,12 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
     // MARK: - Text fields
 
     func controlTextDidChange(_ notification: Notification) {
-        guard let field = notification.object as? NSTextField, field === filterField else { return }
+        guard let field = notification.object as? NSTextField, field === filterField.field else { return }
         setFilter(field.stringValue)
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
-        guard let field = notification.object as? NSTextField, field !== filterField else { return }
+        guard let field = notification.object as? NSTextField, field !== filterField.field else { return }
         if field === detailAliasField, case .item(let id)? = selection {
             setAlias(field.stringValue, for: id)
         } else if field.isDescendant(of: table), lines.indices.contains(field.tag), case .item(let row) = lines[field.tag] {
@@ -462,7 +511,7 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         host?.recordHotkey(for: .item(row.item.id), title: row.item.title)
     }
 
-    @objc private func enabledChanged(_ sender: NSButton) {
+    @objc private func enabledChanged(_ sender: ChromeCheckbox) {
         guard lines.indices.contains(sender.tag), case .item(let row) = lines[sender.tag] else { return }
         setEnabled(sender.state == .on, for: row.item.id)
     }
@@ -472,17 +521,17 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         host?.recordHotkey(for: .item(id), title: item.title)
     }
 
-    @objc private func detailEnabledChanged(_ sender: NSButton) {
+    @objc private func detailEnabledChanged(_ sender: ChromeSwitch) {
         guard case .item(let id)? = selection else { return }
         setEnabled(sender.state == .on, for: id)
     }
 
-    @objc private func detailFavoriteChanged(_ sender: NSButton) {
+    @objc private func detailFavoriteChanged(_ sender: ChromeSwitch) {
         guard case .item(let id)? = selection else { return }
         setFavorite(sender.state == .on, for: id)
     }
 
-    @objc private func detailFallbackChanged(_ sender: NSButton) {
+    @objc private func detailFallbackChanged(_ sender: ChromeSwitch) {
         guard case .item(let id)? = selection else { return }
         setFallback(sender.state == .on, for: id)
     }
@@ -553,92 +602,100 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
             type: row.typeLabel,
             chrome: chrome
         )]
+        // The facts (`.detail-facts`): subtitle and id in SF Mono 11, 4 pt apart.
+        let facts = NSStackView()
+        facts.orientation = .vertical
+        facts.alignment = .leading
+        facts.spacing = 4
         if !item.subtitle.isEmpty {
-            views.append(chrome.wrappingLabel(item.subtitle))
+            let subtitle = chrome.wrappingLabel(item.subtitle, font: ChromeFont.monoSmall)
+            facts.addArrangedSubview(subtitle)
+            subtitle.widthAnchor.constraint(equalTo: facts.widthAnchor).isActive = true
         }
-        let idLabel = chrome.wrappingLabel(item.id.rawValue)
+        let idLabel = chrome.wrappingLabel(item.id.rawValue, font: ChromeFont.monoSmall)
         idLabel.isSelectable = true
         idLabel.toolTip = "The id settings.json uses for this command"
-        views.append(idLabel)
+        facts.addArrangedSubview(idLabel)
+        idLabel.widthAnchor.constraint(equalTo: facts.widthAnchor).isActive = true
+        views.append(facts)
 
-        let (section, body) = chrome.sectionCard(title: "command")
-        let alias = chrome.textField(row.alias ?? "", placeholder: "add alias", width: 130)
+        let (section, body) = chrome.sectionCard(title: "Command")
+        let alias = chrome.textField(row.alias ?? "", placeholder: "add alias", width: Self.detailControlWidth)
         alias.delegate = self
-        detailAliasField = alias
+        detailAliasField = alias.field
         let hotkey = HotkeyButton(
-            keycaps: row.hotkey.map(KeyboardLayout.keycaps(for:)) ?? [],
+            keycaps: row.hotkey.map(KeyboardLayout.caps(for:)) ?? [],
             theme: host.theme,
+            style: .standard,
             target: self,
             action: #selector(detailRecordHotkey)
         )
         chrome.addRows([
-            chrome.row(label: "Alias", control: alias, toolTip: "Typed in Root Search, it puts this command first."),
-            chrome.row(label: "Hotkey", control: hotkey),
-            chrome.row(
+            chrome.detailRow(label: "Alias", control: alias, toolTip: "Typed in Root Search, it puts this command first."),
+            chrome.detailRow(label: "Hotkey", control: hotkey),
+            chrome.detailRow(
                 label: "Show in Root Search",
-                control: chrome.checkbox(isOn: row.isEnabled, accessibilityLabel: "Show in Root Search", target: self, action: #selector(detailEnabledChanged(_:))),
+                control: chrome.switchControl(isOn: row.isEnabled, accessibilityLabel: "Show in Root Search", target: self, action: #selector(detailEnabledChanged(_:))),
                 toolTip: "Hidden commands still run from their hotkey."
             ),
-            chrome.row(
+            chrome.detailRow(
                 label: "Favorite",
-                control: chrome.checkbox(isOn: row.isFavorite, accessibilityLabel: "Favorite", target: self, action: #selector(detailFavoriteChanged(_:)))
+                control: chrome.switchControl(isOn: row.isFavorite, accessibilityLabel: "Favorite", target: self, action: #selector(detailFavoriteChanged(_:)))
             ),
-            chrome.row(
+            chrome.detailRow(
                 label: "Fallback command",
-                control: chrome.checkbox(isOn: row.isFallback, accessibilityLabel: "Fallback command", target: self, action: #selector(detailFallbackChanged(_:))),
+                control: chrome.switchControl(isOn: row.isFallback, accessibilityLabel: "Fallback command", target: self, action: #selector(detailFallbackChanged(_:))),
                 toolTip: "Offered below the results of any search."
             ),
         ], to: body)
         views.append(section)
 
         if item.kind == .quicklink, let quicklink = host.settings.quicklinks.first(where: { $0.id == item.id.key }) {
-            let (linkSection, linkBody) = chrome.sectionCard(title: "quicklink")
+            let (linkSection, linkBody) = chrome.sectionCard(title: "Quicklink")
             let form = QuicklinkFormView(fields: QuicklinkFields(quicklink), apps: Self.apps(in: host.items), chrome: chrome)
             quicklinkForm = form
             chrome.addRows(form.rows, to: linkBody)
-            linkBody.addArrangedSubview(chrome.hstack([
-                chrome.button("Save", kind: .prominent, target: self, action: #selector(saveQuicklinkClicked)),
-                DangerButton(title: "Delete Quicklink", theme: host.theme, target: self, action: #selector(deleteQuicklinkClicked)),
-            ]))
+            chrome.addRows([chrome.detailContent(chrome.hstack([
+                chrome.button("Save", kind: .ink, target: self, action: #selector(saveQuicklinkClicked)),
+                chrome.button("Delete Quicklink", kind: .danger, target: self, action: #selector(deleteQuicklinkClicked)),
+            ]), fill: false)], to: linkBody)
             views.append(linkSection)
         }
         return views
     }
 
     private func groupDetail(_ group: ExtensionGroup, chrome: SettingsChrome, host: SettingsHost) -> [NSView] {
-        var views: [NSView] = [chrome.tabHeader(title: group.title, subtitle: Self.groupDescription(group))]
+        var views: [NSView] = [chrome.tabHeader(title: group.title, subtitle: Self.groupDescription(group), titleFont: ChromeFont.headline)]
         switch group {
         case .applications, .scriptCommands:
             let isApps = group == .applications
             let (section, body) = chrome.sectionCard(
-                title: isApps ? "application folders" : "script folders",
+                title: isApps ? "Application folders" : "Script folders",
                 subtitle: isApps
                     ? "Searched besides /Applications, /System/Applications, ~/Applications and /System/Library/CoreServices/Applications."
                     : "Raycast-format script commands in these folders and one level of subfolders; changes reload on their own."
             )
             let folders = Self.directories(group, in: host.settings)
             if folders.isEmpty {
-                let label = chrome.wrappingLabel(isApps ? "No extra folders." : "No script folders yet.")
-                body.addArrangedSubview(label)
-                label.widthAnchor.constraint(equalTo: body.widthAnchor, constant: -2 * SettingsChrome.cardInset).isActive = true
+                chrome.addRows([chrome.detailContent(chrome.wrappingLabel(isApps ? "No extra folders." : "No script folders yet."))], to: body)
             } else {
                 chrome.addRows(folders.enumerated().map { index, path in
                     let remove = chrome.iconButton(symbol: "xmark", label: "Remove \(path)", target: self, action: #selector(removeFolderClicked(_:)))
                     remove.tag = index
-                    return chrome.row(label: "", control: chrome.hstack([chrome.lineLabel(path), remove]))
+                    return chrome.detailContent(chrome.hstack([chrome.lineLabel(path, font: ChromeFont.mono), remove]))
                 }, to: body)
             }
-            body.addArrangedSubview(chrome.button("Add Folder…", target: self, action: #selector(addFolderClicked)))
+            chrome.addRows([chrome.detailContent(chrome.button("Add Folder…", target: self, action: #selector(addFolderClicked)), fill: false)], to: body)
             views.append(section)
         case .quicklinks:
             let (section, body) = chrome.sectionCard(
-                title: "create quicklink",
+                title: "Create quicklink",
                 subtitle: "Placeholders: {argument}, {argument name=\"query\"}, {clipboard}, {date}, {time}, {uuid}."
             )
             let form = QuicklinkFormView(fields: QuicklinkFields(), apps: Self.apps(in: host.items), chrome: chrome)
             quicklinkForm = form
             chrome.addRows(form.rows, to: body)
-            body.addArrangedSubview(chrome.button("Create Quicklink", kind: .prominent, target: self, action: #selector(createQuicklinkClicked)))
+            chrome.addRows([chrome.detailContent(chrome.button("Create Quicklink", kind: .ink, target: self, action: #selector(createQuicklinkClicked)), fill: false)], to: body)
             views.append(section)
         case .windowManagement:
             let settings = host.settings.windowManagement
@@ -647,14 +704,14 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
                 gaps.append((settings.gap, "\(settings.gap) points"))
             }
             gapValues = gaps.map(\.0)
-            let (section, body) = chrome.sectionCard(title: "window management")
+            let (section, body) = chrome.sectionCard(title: "Window Management")
             chrome.addRows([
-                chrome.row(
+                chrome.detailRow(
                     label: "Gap",
                     control: chrome.popup(titles: gaps.map(\.1), selected: gaps.firstIndex { $0.0 == settings.gap }, width: Self.detailControlWidth, target: self, action: #selector(gapChanged(_:))),
                     toolTip: "Space between windows and the display edges."
                 ),
-                chrome.row(
+                chrome.detailRow(
                     label: "Cycling",
                     control: chrome.popup(
                         titles: Self.halvesChoices.map(\.1),
@@ -699,19 +756,14 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
-        for view in [filterField, countLabel] as [NSView] {
+        for view in [titleLabel, countLabel, filterField] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             topBar.addSubview(view)
         }
+        titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        countLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         filterField.delegate = self
-        filterField.isBordered = true
-        filterField.focusRingType = .none
-        filterField.drawsBackground = true
-        filterField.wantsLayer = true
-        filterField.layer?.borderWidth = Retro.hairline
-        filterField.font = RetroFont.body(12)
-        filterField.cell?.usesSingleLineMode = true
-        filterField.setAccessibilityLabel("Search commands")
+        filterField.field.setAccessibilityLabel("Search commands")
 
         for column in Column.allCases {
             let tableColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(column.rawValue))
@@ -740,8 +792,12 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         table.setAccessibilityLabel("Commands")
         scrollView.documentView = table
         scrollView.drawsBackground = false
+        // The scroll thumb stays visible, like the mockup's table: a legacy (always shown)
+        // scroller that draws only a `scrollbarThumb` thumb on no track.
+        scrollView.scrollerStyle = .legacy
+        scrollView.verticalScroller = ThumbScroller()
         scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
+        scrollView.autohidesScrollers = false
         // Views draw past their bounds unless told otherwise (macOS 14); the floating
         // group row and the header must stay inside the table's area.
         scrollView.clipsToBounds = true
@@ -755,12 +811,15 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
             topBar.topAnchor.constraint(equalTo: topAnchor),
             topBar.heightAnchor.constraint(equalToConstant: Self.topBarHeight),
 
-            filterField.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 14),
+            // One 52 bar: the screen title and its baseline-aligned count left, search right.
+            titleLabel.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: Chrome.Space.panel),
+            titleLabel.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
+            countLabel.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 10),
+            countLabel.firstBaselineAnchor.constraint(equalTo: titleLabel.firstBaselineAnchor),
+            filterField.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -Chrome.Space.panel),
             filterField.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
             filterField.widthAnchor.constraint(equalToConstant: 260),
-            countLabel.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -14),
-            countLabel.centerYAnchor.constraint(equalTo: topBar.centerYAnchor),
-            countLabel.leadingAnchor.constraint(greaterThanOrEqualTo: filterField.trailingAnchor, constant: 12),
+            filterField.leadingAnchor.constraint(greaterThanOrEqualTo: countLabel.trailingAnchor, constant: 12),
 
             header.leadingAnchor.constraint(equalTo: leadingAnchor),
             header.trailingAnchor.constraint(equalTo: rule.leadingAnchor),
@@ -774,7 +833,6 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
 
             rule.topAnchor.constraint(equalTo: topAnchor),
             rule.bottomAnchor.constraint(equalTo: bottomAnchor),
-            rule.widthAnchor.constraint(equalToConstant: Retro.hairline),
             rule.trailingAnchor.constraint(equalTo: detail.leadingAnchor),
 
             detail.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -788,21 +846,36 @@ final class ExtensionsSettingsPane: NSView, SettingsPane, NSTableViewDataSource,
         let colors = theme.colors
         topBar.color = colors.bgBase
         rule.color = colors.borderStrong
-        filterField.backgroundColor = colors.bgRaised
-        filterField.textColor = colors.textPrimary
-        filterField.layer?.borderColor = colors.borderStrong.cgColor
-        filterField.placeholderAttributedString = NSAttributedString(
-            string: "search commands…",
-            attributes: [.font: RetroFont.body(12), .foregroundColor: colors.textMuted]
-        )
+        titleLabel.setChromeText("Extensions", font: ChromeFont.screen, color: colors.textPrimary, tracking: -0.2)
+        filterField.apply(theme: theme)
         header.colors = colors
+        (scrollView.verticalScroller as? ThumbScroller)?.thumbColor = colors.scrollbarThumb
+    }
+}
+
+/// A vertical scroller that draws a rounded `scrollbarThumb` thumb and no track.
+@MainActor
+final class ThumbScroller: NSScroller {
+    var thumbColor = NSColor.clear {
+        didSet { needsDisplay = true }
+    }
+
+    override class var isCompatibleWithOverlayScrollers: Bool { false }
+
+    override func drawKnobSlot(in slotRect: NSRect, highlight flag: Bool) {}
+
+    override func drawKnob() {
+        let knob = rect(for: .knob).insetBy(dx: 4, dy: 2)
+        guard knob.height > 0 else { return }
+        thumbColor.setFill()
+        NSBezierPath(roundedRect: knob, xRadius: knob.width / 2, yRadius: knob.width / 2).fill()
     }
 }
 
 // MARK: - Table pieces
 
-/// The column titles above the table (display 11, muted) over a hairline, placed where
-/// the table's columns are.
+/// The column titles above the table (eyebrows, muted) over a hairline, placed where the
+/// table's columns are.
 @MainActor
 final class ExtensionsHeaderView: FlippedView {
     static let height: CGFloat = 26
@@ -819,18 +892,17 @@ final class ExtensionsHeaderView: FlippedView {
         bounds.fill()
         for (index, title) in columns.enumerated() where index < table.numberOfColumns {
             let rect = convert(table.rect(ofColumn: index), from: table)
-            let text = RetroText.display(title, color: colors.textMuted)
+            let text = ChromeText.eyebrow(title, color: colors.textMuted)
             let size = text.size()
             let x: CGFloat = switch index {
-            case 0: rect.minX + 14
+            case 0: rect.minX + ExtensionsSettingsPane.tableLeading
             case columns.count - 1: rect.midX - size.width / 2
-            case columns.count - 2: rect.maxX - 12 - size.width
-            default: rect.minX + 6
+            default: rect.minX + ExtensionsSettingsPane.columnGap
             }
             text.draw(at: NSPoint(x: x, y: floor((bounds.height - size.height) / 2)))
         }
         colors.borderSubtle.setFill()
-        NSRect(x: 0, y: bounds.height - Retro.hairline, width: bounds.width, height: Retro.hairline).fill()
+        NSRect(x: 0, y: bounds.height - Chrome.hairline, width: bounds.width, height: Chrome.hairline).fill()
     }
 
     override func layout() {
@@ -839,28 +911,49 @@ final class ExtensionsHeaderView: FlippedView {
     }
 }
 
-/// Rows: the selected one in `bgSelectedStrong` with a 2 pt `accent` rail (the launcher's
-/// selection); group rows on `bgPanel`.
+/// Rows on `bgBase`. The selected one is the focused pill with the pencil tick while the
+/// table holds the keyboard, the muted pill otherwise; a hovered row gets the hover pill;
+/// group rows carry a hairline under them.
 @MainActor
 final class ExtensionsRowView: NSTableRowView {
     var colors: ThemeColors?
+    /// The pointer is over this command row (`ExtensionsTableView.hoveredRow`).
+    var isHovered = false {
+        didSet {
+            guard isHovered != oldValue else { return }
+            needsDisplay = true
+        }
+    }
+
+    /// The table holds the keyboard: the selection is the focused pill with the pencil
+    /// tick; otherwise the muted pill without it.
+    var isTableFocused: Bool {
+        guard let table = superview as? NSTableView else { return false }
+        return table.window?.firstResponder === table
+    }
+
+    /// The pill this row draws, for tests.
+    var pillStyle: ChromeSelectionPill.Style {
+        if isGroupRowStyle { return .none }
+        if isSelected { return isTableFocused ? .selected : .selectedUnfocused }
+        return isHovered ? .hover : .none
+    }
 
     override func drawBackground(in dirtyRect: NSRect) {
         guard let colors else { return super.drawBackground(in: dirtyRect) }
-        (isGroupRowStyle ? colors.bgPanel : colors.bgBase).setFill()
+        colors.bgBase.setFill()
         bounds.fill()
         if isGroupRowStyle {
             colors.borderSubtle.setFill()
-            NSRect(x: 0, y: bounds.height - Retro.hairline, width: bounds.width, height: Retro.hairline).fill()
+            NSRect(x: 0, y: bounds.height - Chrome.hairline, width: bounds.width, height: Chrome.hairline).fill()
+        } else if !isSelected, isHovered {
+            ChromeSelectionPill.draw(.hover, in: bounds, colors: colors, inset: Chrome.pillInset)
         }
     }
 
     override func drawSelection(in dirtyRect: NSRect) {
         guard let colors else { return super.drawSelection(in: dirtyRect) }
-        colors.bgSelectedStrong.setFill()
-        bounds.fill()
-        colors.accent.setFill()
-        NSRect(x: 0, y: 0, width: 2, height: bounds.height).fill()
+        ChromeSelectionPill.draw(pillStyle, in: bounds, colors: colors, inset: Chrome.pillInset)
     }
 
     override var isEmphasized: Bool {
@@ -869,26 +962,93 @@ final class ExtensionsRowView: NSTableRowView {
     }
 }
 
-/// A group row: disclosure chevron, the group title (display 11) and its command count.
+/// The commands table: redraws its rows' pills when it gains or loses the keyboard, and
+/// tracks the row under the pointer for the hover pill (tracking works while Soprano Cast
+/// is not the active app).
+@MainActor
+final class ExtensionsTableView: NSTableView {
+    private(set) var hoveredRow = -1
+    private var hoverArea: NSTrackingArea?
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        redrawRows()
+        return became
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        redrawRows()
+        return resigned
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea {
+            removeTrackingArea(hoverArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self
+        )
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        setHoveredRow(row(at: convert(event.locationInWindow, from: nil)))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        setHoveredRow(row(at: convert(event.locationInWindow, from: nil)))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        setHoveredRow(-1)
+    }
+
+    /// Moves the hover pill to `row` (-1: none).
+    func setHoveredRow(_ row: Int) {
+        guard row != hoveredRow else { return }
+        hoveredRow = row
+        enumerateAvailableRowViews { view, index in
+            (view as? ExtensionsRowView)?.isHovered = index == row
+        }
+    }
+
+    private func redrawRows() {
+        enumerateAvailableRowViews { view, _ in view.needsDisplay = true }
+    }
+}
+
+/// A group row: a 12 pt chevron, the group title (SF 12 Semibold) and its command count.
 @MainActor
 final class GroupCellView: NSTableCellView {
+    private static let chevronSize: CGFloat = 16
+
     init(section: ExtensionSection, collapsed: Bool, chrome: SettingsChrome, target: AnyObject, toggle: Selector, tag: Int) {
         super.init(frame: .zero)
         let chevron = chrome.iconButton(
             symbol: collapsed ? "chevron.right" : "chevron.down",
             label: collapsed ? "Expand \(section.group.title)" : "Collapse \(section.group.title)",
+            pointSize: 12,
+            size: Self.chevronSize,
             target: target,
             action: toggle
         )
         chevron.tag = tag
-        let title = NSTextField(labelWithString: section.group.title)
-        title.setRetroText(section.group.title, color: chrome.colors.textPrimary)
-        let count = chrome.lineLabel("\(section.rows.count)", color: chrome.colors.textMuted, size: 11)
+        let title = chrome.lineLabel(section.group.title, font: ChromeFont.sans(size: 12, weight: .semibold))
+        let count = chrome.lineLabel("\(section.rows.count)", color: chrome.colors.textMuted, font: ChromeFont.sans(size: 12, tabular: true))
         let stack = chrome.hstack([chevron, title, count], spacing: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            // The 12 pt glyph starts at the table's 16 pt leading padding.
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: ExtensionsSettingsPane.tableLeading - (Self.chevronSize - 12) / 2),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }
@@ -901,7 +1061,8 @@ final class GroupCellView: NSTableCellView {
 
 // MARK: - Detail pieces
 
-/// The detail pane's title: a 32 pt icon, the title (body 15) and the type (display 11).
+/// The detail pane's title (`.detail-head`): a 32 pt icon beside the New York 17 title and
+/// the meta type, centered on it.
 @MainActor
 final class DetailHeaderView: NSView {
     init(icon: NSImage, title: String, type: String, chrome: SettingsChrome) {
@@ -909,26 +1070,33 @@ final class DetailHeaderView: NSView {
         translatesAutoresizingMaskIntoConstraints = false
         let iconView = NSImageView(image: icon)
         iconView.imageScaling = .scaleProportionallyUpOrDown
-        let titleLabel = chrome.wrappingLabel(title, color: chrome.colors.textPrimary, size: 15)
-        let typeLabel = NSTextField(labelWithString: type)
-        typeLabel.setRetroText(type, color: chrome.colors.textMuted)
-        for view in [iconView, titleLabel, typeLabel] as [NSView] {
+        let titleLabel = chrome.wrappingLabel(title, color: chrome.colors.textPrimary, font: ChromeFont.headline)
+        let typeLabel = chrome.lineLabel(type, color: chrome.colors.textMuted, font: ChromeFont.meta)
+        let text = NSStackView(views: [titleLabel, typeLabel])
+        text.orientation = .vertical
+        text.alignment = .leading
+        text.spacing = 1
+        for view in [iconView, text] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
         NSLayoutConstraint.activate([
             iconView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            iconView.topAnchor.constraint(equalTo: topAnchor),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
             iconView.widthAnchor.constraint(equalToConstant: 32),
             iconView.heightAnchor.constraint(equalToConstant: 32),
-            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor),
-            titleLabel.topAnchor.constraint(equalTo: topAnchor),
-            typeLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            typeLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            iconView.topAnchor.constraint(greaterThanOrEqualTo: topAnchor),
+            text.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 12),
+            text.trailingAnchor.constraint(equalTo: trailingAnchor),
+            text.centerYAnchor.constraint(equalTo: centerYAnchor),
+            text.topAnchor.constraint(greaterThanOrEqualTo: topAnchor),
+            titleLabel.widthAnchor.constraint(equalTo: text.widthAnchor),
             bottomAnchor.constraint(greaterThanOrEqualTo: iconView.bottomAnchor),
-            bottomAnchor.constraint(greaterThanOrEqualTo: typeLabel.bottomAnchor),
+            bottomAnchor.constraint(greaterThanOrEqualTo: text.bottomAnchor),
         ])
+        let hug = heightAnchor.constraint(equalToConstant: 0)
+        hug.priority = .defaultLow
+        hug.isActive = true
     }
 
     @available(*, unavailable)
@@ -941,10 +1109,10 @@ final class DetailHeaderView: NSView {
 @MainActor
 final class QuicklinkFormView {
     let rows: [NSView]
-    private let name: NSTextField
-    private let link: NSTextField
+    private let name: SettingsField
+    private let link: SettingsField
     private let openWith: NSPopUpButton
-    private let icon: NSTextField
+    private let icon: SettingsField
     /// The `openWith` values behind the pop-up's items ("" = the default app).
     private let openWithValues: [String]
 
@@ -967,18 +1135,13 @@ final class QuicklinkFormView {
             }
         }
         openWithValues = values
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.addItems(withTitles: titles)
-        popup.selectItem(at: selected)
-        popup.font = RetroFont.body(12)
-        popup.translatesAutoresizingMaskIntoConstraints = false
-        popup.widthAnchor.constraint(equalToConstant: width).isActive = true
+        let popup = chrome.popup(titles: titles, selected: selected, width: width, target: nil, action: nil)
         openWith = popup
         rows = [
-            chrome.row(label: "Name", control: name),
-            chrome.row(label: "Link", control: link, toolTip: "A URL, a file or folder path (~ allowed) or a deeplink."),
-            chrome.row(label: "Open with", control: popup),
-            chrome.row(label: "Icon", control: icon),
+            chrome.detailRow(label: "Name", control: name),
+            chrome.detailRow(label: "Link", control: link, toolTip: "A URL, a file or folder path (~ allowed) or a deeplink."),
+            chrome.detailRow(label: "Open with", control: popup),
+            chrome.detailRow(label: "Icon", control: icon),
         ]
     }
 
@@ -990,5 +1153,17 @@ final class QuicklinkFormView {
             openWith: openWithValues.indices.contains(index) ? openWithValues[index] : "",
             icon: icon.stringValue
         )
+    }
+}
+
+private extension SettingsChrome {
+    /// A form row of the detail pane (`.ext-detail .form-row`): padding 6/12, min 40.
+    func detailRow(label: String, control: NSView, toolTip: String? = nil) -> NSView {
+        row(label: label, control: control, toolTip: toolTip, minHeight: Self.detailRowHeight, padding: Self.detailRowPadding)
+    }
+
+    /// Any view as a detail card row.
+    func detailContent(_ view: NSView, fill: Bool = true) -> NSView {
+        content(view, fill: fill, padding: Self.detailRowPadding)
     }
 }

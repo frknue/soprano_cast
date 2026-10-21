@@ -43,7 +43,7 @@ final class GeneralSettingsPane: NSView, SettingsPane {
             listCard(
                 chrome,
                 host,
-                title: "favorites",
+                title: "Favorites",
                 subtitle: "Root Search shows these first while the search is empty, in this order. Add more with ⌘F in Root Search or Favorite in Extensions.",
                 ids: listedFavorites,
                 empty: "No favorites yet.",
@@ -54,7 +54,7 @@ final class GeneralSettingsPane: NSView, SettingsPane {
             listCard(
                 chrome,
                 host,
-                title: "fallback commands",
+                title: "Fallback commands",
                 subtitle: "Listed below the results of any search (“Use “x” with …”), in this order. Add more with Fallback command in Extensions.",
                 ids: listedFallbacks,
                 empty: "No fallback commands.",
@@ -72,34 +72,30 @@ final class GeneralSettingsPane: NSView, SettingsPane {
             title: "settings.json",
             subtitle: "This window edits \(host.settingsPath). Hand edits apply as soon as you save; comments and key order are kept."
         )
-        for issue in host.issues {
-            let row = chrome.issueRow(issue)
-            body.addArrangedSubview(row)
-            row.widthAnchor.constraint(equalTo: body.widthAnchor, constant: -2 * SettingsChrome.cardInset).isActive = true
-        }
         let buttons = chrome.hstack([
             chrome.button("Open settings.json", target: self, action: #selector(openFile)),
             chrome.button("Reveal in Finder", target: self, action: #selector(revealFile)),
         ])
-        body.addArrangedSubview(buttons)
+        chrome.addRows(host.issues.map { chrome.content(chrome.issueRow($0)) } + [chrome.content(buttons, fill: false)], to: body)
         return section
     }
 
     private func castCard(_ chrome: SettingsChrome, _ host: SettingsHost) -> NSView {
         let settings = host.settings
-        let (section, body) = chrome.sectionCard(title: "soprano cast")
-        let themes = AppTheme.allThemes
+        let (section, body) = chrome.sectionCard(title: "Soprano Cast")
+        let themes = AppTheme.options
         let themeIndex = settings.theme == "soprano" ? 0 : themes.firstIndex { $0.id == settings.theme }.map { $0 + 1 }
         let hotkey = HotkeyButton(
-            keycaps: settings.launcher.hotkey.map(KeyboardLayout.keycaps(for:)) ?? [],
+            keycaps: settings.launcher.hotkey.map(KeyboardLayout.caps(for:)) ?? [],
             theme: host.theme,
+            style: .field,
             target: self,
             action: #selector(recordLauncherHotkey)
         )
         chrome.addRows([
             chrome.row(
                 label: "Launch at login",
-                control: chrome.checkbox(isOn: settings.app.startAtLogin, accessibilityLabel: "Launch at login", target: self, action: #selector(startAtLoginChanged(_:)))
+                control: chrome.switchControl(isOn: settings.app.startAtLogin, accessibilityLabel: "Launch at login", target: self, action: #selector(startAtLoginChanged(_:)))
             ),
             chrome.row(
                 label: "Soprano Cast hotkey",
@@ -108,7 +104,7 @@ final class GeneralSettingsPane: NSView, SettingsPane {
             ),
             chrome.row(
                 label: "Show in menu bar",
-                control: chrome.checkbox(isOn: settings.app.showMenuBarIcon, accessibilityLabel: "Show in menu bar", target: self, action: #selector(menuBarIconChanged(_:))),
+                control: chrome.switchControl(isOn: settings.app.showMenuBarIcon, accessibilityLabel: "Show in menu bar", target: self, action: #selector(menuBarIconChanged(_:))),
                 toolTip: "Without the icon, open these settings with ⌘, in Soprano Cast."
             ),
             chrome.row(
@@ -137,9 +133,7 @@ final class GeneralSettingsPane: NSView, SettingsPane {
     ) -> NSView {
         let (section, body) = chrome.sectionCard(title: title, subtitle: subtitle)
         guard !ids.isEmpty else {
-            let label = chrome.wrappingLabel(empty)
-            body.addArrangedSubview(label)
-            label.widthAnchor.constraint(equalTo: body.widthAnchor, constant: -2 * SettingsChrome.cardInset).isActive = true
+            chrome.addRows([chrome.content(chrome.wrappingLabel(empty))], to: body)
             return section
         }
         let items = Dictionary(host.items.map { ($0.id, $0) }) { first, _ in first }
@@ -171,11 +165,11 @@ final class GeneralSettingsPane: NSView, SettingsPane {
         host?.revealSettingsFile()
     }
 
-    @objc private func startAtLoginChanged(_ sender: NSButton) {
+    @objc private func startAtLoginChanged(_ sender: ChromeSwitch) {
         host?.apply([.set(sender.state == .on, ["app", "startAtLogin"])])
     }
 
-    @objc private func menuBarIconChanged(_ sender: NSButton) {
+    @objc private func menuBarIconChanged(_ sender: ChromeSwitch) {
         host?.apply([.set(sender.state == .on, ["app", "showMenuBarIcon"])])
     }
 
@@ -183,9 +177,10 @@ final class GeneralSettingsPane: NSView, SettingsPane {
         host?.recordHotkey(for: .launcher, title: "Soprano Cast")
     }
 
+    /// Index 0 follows Soprano; the rest are `AppTheme.options` (Folio first).
     @objc private func themeChanged(_ sender: NSPopUpButton) {
         let index = sender.indexOfSelectedItem
-        let themes = AppTheme.allThemes
+        let themes = AppTheme.options
         let id = index <= 0 ? "soprano" : themes[min(index - 1, themes.count - 1)].id
         host?.apply([.set(id, ["theme"])])
     }
@@ -250,10 +245,10 @@ final class ItemListRow: NSView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         let icon = NSImageView()
-        icon.image = item.map { icons.image(for: $0.icon, size: 16) }
+        icon.image = item.map { icons.image(for: $0.icon, size: 18) }
         icon.imageScaling = .scaleProportionallyUpOrDown
-        let title = chrome.lineLabel(item?.title ?? id.rawValue, color: item == nil ? chrome.colors.textMuted : nil)
-        let type = chrome.lineLabel(item?.kind?.label ?? "not available", color: chrome.colors.textMuted, size: 11)
+        let title = chrome.lineLabel(item?.title ?? id.rawValue, color: item == nil ? chrome.colors.textMuted : nil, font: ChromeFont.row)
+        let type = chrome.lineLabel(item?.kind?.label ?? "Not available", color: chrome.colors.textMuted, font: ChromeFont.meta)
         var buttons: [NSView] = []
         if let up {
             let button = chrome.iconButton(symbol: "chevron.up", label: "Move up", target: target, action: up)
@@ -278,16 +273,16 @@ final class ItemListRow: NSView {
         }
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: SettingsChrome.rowHeight),
-            icon.leadingAnchor.constraint(equalTo: leadingAnchor),
+            icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SettingsChrome.cardInset),
             icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-            icon.widthAnchor.constraint(equalToConstant: 16),
-            icon.heightAnchor.constraint(equalToConstant: 16),
+            icon.widthAnchor.constraint(equalToConstant: 18),
+            icon.heightAnchor.constraint(equalToConstant: 18),
             title.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
             title.centerYAnchor.constraint(equalTo: centerYAnchor),
             type.leadingAnchor.constraint(equalTo: title.trailingAnchor, constant: 8),
             type.firstBaselineAnchor.constraint(equalTo: title.firstBaselineAnchor),
             type.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor, constant: -8),
-            controls.trailingAnchor.constraint(equalTo: trailingAnchor),
+            controls.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SettingsChrome.cardInset + 4),
             controls.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }

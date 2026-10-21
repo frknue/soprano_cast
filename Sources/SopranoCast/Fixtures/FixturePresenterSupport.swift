@@ -66,7 +66,7 @@ final class FixturePresenterSupport {
         LauncherEnvironment(
             settings: { [settingsStore] in settingsStore.settings },
             editSettings: { [settingsStore] edit in try settingsStore.apply(edit) },
-            theme: { [settingsStore] in AppTheme.theme(for: settingsStore.settings.theme) },
+            theme: { [settingsStore] in FixtureTheme.resolve(settingsStore.settings.theme) },
             now: { self.now },
             schedule: { milliseconds, work in self.schedule(after: milliseconds, work) },
             screenFrame: { _ in self.visibleFrame },
@@ -90,7 +90,7 @@ final class FixturePresenterSupport {
             settingsPath: "~/.config/soprano-cast/settings.json",
             editSettings: { [settingsStore] edit in try settingsStore.apply(edit) },
             items: items,
-            theme: { [settingsStore] in AppTheme.theme(for: settingsStore.settings.theme) },
+            theme: { [settingsStore] in FixtureTheme.resolve(settingsStore.settings.theme) },
             schedule: { milliseconds, work in self.schedule(after: milliseconds, work) },
             openSettingsFile: { self.windowLog.append("open settings.json") },
             revealSettingsFile: { self.windowLog.append("reveal settings.json") },
@@ -133,12 +133,20 @@ final class FixturePresenterSupport {
     }
 }
 
+/// Fixture themes never depend on the system appearance or Soprano's file: "soprano" and
+/// "folio" draw Folio Paper; every other id its own palette (`--theme folio-ink` for Ink).
+enum FixtureTheme {
+    static func resolve(_ id: String) -> AppTheme {
+        AppTheme.theme(for: id == ThemeCenter.followSopranoID ? AppTheme.folioId : id, appearance: .light)
+    }
+}
+
 /// settings.json in memory: `SettingsEdit`s are applied to the JSONC text with
 /// `SettingsEditor` and the result resolved with `SettingsResolver`, like the settings
 /// center does with the real file. Every applied edit is recorded.
 @MainActor
 final class FixtureSettingsStore {
-    static let knownThemeIDs = Set(AppTheme.allThemes.map(\.id))
+    static let knownThemeIDs = ThemeCenter.knownThemeIDs
 
     private(set) var text: String
     private(set) var settings: CastSettings

@@ -126,6 +126,19 @@ struct SnapshotCommandTests {
         #expect(result.report.runs.isEmpty && result.report.edits.isEmpty)
     }
 
+    @Test("snapshots draw Folio Paper by default and Folio Ink with --theme folio-ink, whatever the system")
+    func snapshotThemes() throws {
+        #expect(FixtureTheme.resolve("soprano").id == "folio-paper")
+        #expect(FixtureTheme.resolve("folio").id == "folio-paper")
+        #expect(FixtureTheme.resolve("folio-ink").id == "folio-ink")
+        #expect(FixtureTheme.resolve("nord").id == "nord")
+        _ = try Command.render(try parse(["--theme", "folio-ink"]))
+        #expect(NSApplication.shared.appearance?.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
+        _ = try Command.render(try parse([]))
+        #expect(NSApplication.shared.appearance?.bestMatch(from: [.aqua, .darkAqua]) == .aqua)
+        #expect(throws: FixtureError.self) { try render(["--theme", "mission-control"]) }
+    }
+
     @Test("the settings-window options parse; each mode rejects the other's options")
     func settingsWindowOptions() throws {
         let options = try parse([

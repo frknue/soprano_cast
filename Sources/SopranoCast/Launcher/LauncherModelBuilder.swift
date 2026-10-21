@@ -15,7 +15,11 @@ enum LauncherModelBuilder {
     static let placeholder = "Search for apps and commands…"
     static let noResultsText = "No results"
     static let emptyQueryText = "Type to search apps and commands"
-    static let recorderHint = "⌫ clear · ⎋ cancel · ↵ save"
+    static let recorderHints = [
+        RecorderHint(caps: ["⌫"], label: "Clear"),
+        RecorderHint(caps: ["esc"], label: "Cancel"),
+        RecorderHint(caps: ["↵"], label: "Save"),
+    ]
     /// Row icons are drawn at this size (points).
     static let iconSize: CGFloat = 24
 
@@ -24,7 +28,7 @@ enum LauncherModelBuilder {
     ///     and calculator rows).
     ///   - argumentValues: their values in `arguments` order (dropdowns: the option value).
     ///   - focus: the Root Search focus; an overlay overrides it.
-    ///   - keycaps: how an item's hotkey is drawn; physical keys show what they type on the
+    ///   - caps: an item's hotkey as K1 caps; physical keys show what they type on the
     ///     current layout (tests pass a fixed one).
     static func model(
         theme: AppTheme,
@@ -38,7 +42,7 @@ enum LauncherModelBuilder {
         overlay: OverlayViewModel,
         settings: CastSettings,
         icon: (ItemIcon) -> NSImage,
-        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
+        caps: (HotkeySpec) -> [String] = KeyboardLayout.caps(for:)
     ) -> LauncherViewModel {
         let rows = sections.flatMap(\.rows)
         let selected = selectedIndex.flatMap { rows.indices.contains($0) ? rows[$0].item : nil }
@@ -53,7 +57,7 @@ enum LauncherModelBuilder {
                 return SectionViewModel(
                     title: fallbackQuery.map(fallbacksTitle(query:)) ?? section.kind.title,
                     rows: section.rows.map {
-                        row($0, settings: settings, fallbackQuery: fallbackQuery, icon: icon, keycaps: keycaps)
+                        row($0, settings: settings, fallbackQuery: fallbackQuery, icon: icon, caps: caps)
                     }
                 )
             },
@@ -75,9 +79,9 @@ enum LauncherModelBuilder {
         trimmed(query).isEmpty ? emptyQueryText : noResultsText
     }
 
-    /// The fallbacks section's header: `use “<query>” with…`.
+    /// The fallbacks section's header: `Use “<query>” with…`.
     static func fallbacksTitle(query: String) -> String {
-        "use \(quoted(query)) with…"
+        "Use \(quoted(query)) with…"
     }
 
     /// - Parameter fallbackQuery: the trimmed query when the row is in the fallbacks
@@ -87,7 +91,7 @@ enum LauncherModelBuilder {
         settings: CastSettings,
         fallbackQuery: String? = nil,
         icon: (ItemIcon) -> NSImage,
-        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
+        caps: (HotkeySpec) -> [String] = KeyboardLayout.caps(for:)
     ) -> RowViewModel {
         let item = ranked.item
         let subtitle: String
@@ -110,7 +114,7 @@ enum LauncherModelBuilder {
             icon: icon(item.icon),
             accessory: accessory,
             alias: settings.aliases[item.id],
-            hotkeyKeys: settings.hotkeys[item.id].map(keycaps) ?? []
+            hotkeyKeys: settings.hotkeys[item.id].map(caps) ?? []
         )
     }
 
@@ -168,7 +172,7 @@ enum LauncherModelBuilder {
         actions.map { action in
             ActionRowViewModel(
                 title: action.title,
-                keys: action.shortcut.map { HotkeySpec.combo($0).keycaps } ?? [],
+                keys: action.shortcut.map { HotkeySpec.combo($0).caps } ?? [],
                 isDestructive: action.isDestructive
             )
         }
@@ -179,13 +183,9 @@ enum LauncherModelBuilder {
         keys: HotkeyRecordingSession.Keys,
         conflict: String?,
         countdown: Double?,
-        keycaps: (HotkeySpec) -> [String] = KeyboardLayout.keycaps(for:)
+        caps: (HotkeySpec) -> [String] = KeyboardLayout.caps(for:)
     ) -> OverlayViewModel {
-        let shown = switch keys {
-        case .spec(let spec): keycaps(spec)
-        case .display(let display): display
-        }
-        return .recorder(itemTitle: itemTitle, keys: shown, conflict: conflict, countdown: countdown, hint: recorderHint)
+        .recorder(itemTitle: itemTitle, keys: keys.caps(caps), conflict: conflict, countdown: countdown, hints: recorderHints)
     }
 
     /// "Used by <title>" for the target already holding a recorded hotkey.

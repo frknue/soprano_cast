@@ -2,8 +2,8 @@
 
 ## Goal
 
-Soprano Cast: a copy of Raycast's Root Search and hotkeys in the Soprano family, Mission
-Control chrome. Hotkeys behave exactly like Raycast's (`⌘1` opens Google Chrome, `⌘Space`
+Soprano Cast: a copy of Raycast's Root Search and hotkeys in the Soprano family, Folio
+chrome. Hotkeys behave exactly like Raycast's (`⌘1` opens Google Chrome, `⌘Space`
 opens the launcher). Full phase-1 scope: Root Search with favorites, suggestions,
 aliases, calculator, fallbacks, arguments and history; the Action Panel; global hotkeys of
 every Raycast shape and the Hyper key; system commands; window management; quicklinks;
@@ -46,6 +46,13 @@ not copied.
   quicklink edits keep every other entry of the raw array. 416 tests pass; every tab,
   group pane, the recorder (with a conflict) and a realistic settings file checked in the
   `--settings-window` snapshots.
+- Folio (branch `feat/folio-design`): Soprano's Folio design system vendored
+  (`Chrome.swift`, `Theme.swift`; Departure Mono and the Mission Control chrome removed).
+  Launcher, Action Panel, recorder, alias editor, confirmation, output, HUD, settings
+  window and permissions window restyled to `b/cast.html` / `b/cast-settings.html`;
+  hotkeys as K1 caps; Folio Paper / Ink with `folio` following the system and Follow
+  Soprano following Soprano's theme and appearance; Folio menu-bar glyph and app icon.
+  460 tests pass; snapshots checked in Paper and Ink against the mockups.
 
 ## Next
 

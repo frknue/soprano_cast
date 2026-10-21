@@ -7,9 +7,9 @@ import UniformTypeIdentifiers
 private let iconLog = Logger(subsystem: "com.soprano.cast", category: "icons")
 
 /// Item icons: Finder icons of files and bundles, image files as themselves, emoji drawn
-/// into an image, built-in glyphs as SF Symbols in the theme accent on a raised tile, and
-/// remote icons downloaded once into the Caches folder. Everything is cached per (icon,
-/// size); glyph tiles also per theme.
+/// into an image, built-in glyphs as Folio glyph tiles (`glyphTileImage`), and remote
+/// icons downloaded once into the Caches folder. Everything is cached per (icon, size);
+/// glyph tiles also per resolved theme.
 @MainActor
 final class LiveIconProvider: IconProviding {
     private struct CacheKey: Hashable {
@@ -115,23 +115,27 @@ final class LiveIconProvider: IconProviding {
         }
     }
 
-    /// The symbol in the accent, centered on a square `bgRaised` tile.
     private func glyphImage(_ glyph: BuiltinGlyph, size: CGFloat) -> NSImage {
-        let colors = theme().colors
-        let configuration = NSImage.SymbolConfiguration(pointSize: (size * 0.5).rounded(), weight: .medium)
-        let symbol = NSImage(systemSymbolName: Self.symbolName(for: glyph), accessibilityDescription: nil)?
+        Self.glyphTileImage(symbolName: Self.symbolName(for: glyph), size: size, colors: theme().colors)
+    }
+
+    /// A Folio glyph tile: the SF Symbol (Regular, 16 at 24, `textMuted`) centered on a
+    /// `glyphTile` square with radius 5 (both at the 24 pt row size, scaled for others).
+    static func glyphTileImage(symbolName: String, size: CGFloat, colors: ThemeColors) -> NSImage {
+        let configuration = NSImage.SymbolConfiguration(pointSize: (size * 0.58).rounded(), weight: .regular)
+        let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
             .withSymbolConfiguration(configuration)
-        let tinted = symbol.map { Self.tinted($0, color: colors.accent) }
-        return Self.render(size: size) { rect in
-            colors.bgRaised.setFill()
-            rect.fill()
-            guard let tinted else { return }
-            let inset = size * 0.2
-            let available = rect.insetBy(dx: inset, dy: inset)
-            let scale = min(1, available.width / tinted.size.width, available.height / tinted.size.height)
-            let width = tinted.size.width * scale
-            let height = tinted.size.height * scale
-            tinted.draw(in: NSRect(x: rect.midX - width / 2, y: rect.midY - height / 2, width: width, height: height))
+        let ink = symbol.map { Self.tinted($0, color: colors.textMuted) }
+        return render(size: size) { rect in
+            colors.glyphTile.setFill()
+            let radius = size * 5 / 24
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            guard let ink else { return }
+            let side = size * 16 / 24
+            let scale = min(1, side / ink.size.width, side / ink.size.height)
+            let width = ink.size.width * scale
+            let height = ink.size.height * scale
+            ink.draw(in: NSRect(x: rect.midX - width / 2, y: rect.midY - height / 2, width: width, height: height))
         }
     }
 
@@ -225,10 +229,14 @@ final class LiveIconProvider: IconProviding {
             colorSpaceName: .deviceRGB,
             bytesPerRow: 0,
             bitsPerPixel: 0
-        ), let context = NSGraphicsContext(bitmapImageRep: rep) else {
+        ) else {
             return NSImage(size: pointSize)
         }
+        // The size in points first: the context then draws in points at `scale`.
         rep.size = pointSize
+        guard let context = NSGraphicsContext(bitmapImageRep: rep) else {
+            return NSImage(size: pointSize)
+        }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         draw(NSRect(origin: .zero, size: pointSize))

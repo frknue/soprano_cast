@@ -15,7 +15,7 @@ struct RowViewModel {
     var accessory: String
     /// Shown as a badge after the title.
     var alias: String?
-    /// The item's global hotkey as keycaps ("⌘", "1"); the view shows it on the selected row.
+    /// The item's global hotkey as K1 caps ("⌘1"); the view shows it on the selected row.
     var hotkeyKeys: [String]
 }
 
@@ -35,19 +35,24 @@ struct ArgumentFieldViewModel {
 
 struct ActionRowViewModel {
     var title: String
-    /// Shortcut keycaps ("⇧", "⌘", "O"); empty when the action has none.
+    /// Shortcut K1 caps ("⇧⌘O"); empty when the action has none.
     var keys: [String]
     var isDestructive: Bool
 }
 
+/// One hint under the recorder: K1 caps and what they do ("⌫" Clear).
+struct RecorderHint: Equatable {
+    var caps: [String]
+    var label: String
+}
 /// What sits on top of Root Search.
 enum OverlayViewModel {
     case none
     /// The ⌘K Action Panel or the Configure Command submenu; `query` filters it.
     case actionPanel(title: String, query: String, rows: [ActionRowViewModel], selectedIndex: Int?)
-    /// The hotkey recorder: keycaps so far, an owner conflict, the auto-save countdown
-    /// progress (0…1, nil when not counting down), and a hint line.
-    case recorder(itemTitle: String, keys: [String], conflict: String?, countdown: Double?, hint: String)
+    /// The hotkey recorder: K1 caps so far, an owner conflict, the auto-save countdown
+    /// progress (0…1, nil when not counting down), and the key hints.
+    case recorder(itemTitle: String, keys: [String], conflict: String?, countdown: Double?, hints: [RecorderHint])
     case aliasEditor(itemTitle: String, text: String, error: String?)
     /// Script output (fullOutput mode), monospace.
     case output(title: String, text: String, isError: Bool)
@@ -72,6 +77,15 @@ enum LauncherFocus: Equatable {
     case overlay
     /// No text field (recorder, output, confirmation).
     case none
+
+    /// The query or an argument field: Root Search has the keyboard, so its selection
+    /// is drawn focused (pill and pencil tick).
+    var isInRootSearch: Bool {
+        switch self {
+        case .query, .argument: true
+        case .overlay, .none: false
+        }
+    }
 }
 
 struct LauncherViewModel {

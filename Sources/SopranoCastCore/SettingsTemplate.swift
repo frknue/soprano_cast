@@ -46,8 +46,9 @@ public enum SettingsTemplate {
     //   double tap         "double:cmd", "double:rshift": the same modifier twice quickly
     //   both sides         "both:cmd", "both:shift": left and right held together (not fn)
     {
-      // "soprano" follows the theme of Soprano (~/.config/soprano/settings.json),
-      // or any Soprano theme id.
+      // "soprano" follows Soprano's theme and appearance (~/.config/soprano/settings.json);
+      // "folio" (Paper or Ink) follows the system appearance; or a pinned Soprano theme id
+      // (folio-paper, folio-ink, nord, …).
       "theme": "soprano",
 
       "launcher": {

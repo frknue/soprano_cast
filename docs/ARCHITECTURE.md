@@ -3,7 +3,7 @@
 Soprano Cast is a keyboard launcher for macOS in the Soprano family: a copy of Raycast's
 Root Search and its hotkeys (global hotkeys of every Raycast type on any command, aliases,
 favorites, the Action Panel, window management, system commands, quicklinks, Raycast-format
-script commands, an inline calculator) drawn in Soprano's "Mission Control" chrome.
+script commands, an inline calculator) drawn in Soprano's Folio chrome.
 Swift 6 + programmatic AppKit, SPM, macOS 14+, menu-bar app (no Dock icon). Behavior is
 reimplemented from Raycast's manual (manual.raycast.com: Keyboard Shortcuts, Command
 Aliases & Hotkeys, Window Management, Quicklinks) and the script-commands README; no
@@ -26,7 +26,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | Product | Soprano Cast (`/Applications/Soprano Cast.app`) |
 | Bundle id | `com.soprano.cast`; dev `com.soprano.cast.dev` (`Soprano Cast Dev.app`) |
 | Targets | `SopranoCastCore` (library), `SopranoCast` (executable), `SopranoCastTests` |
-| SPM resource bundle | `SopranoCast_SopranoCast.bundle` |
+| App icon | `Sources/SopranoCast/Resources/AppIcon.icns` (Folio Paper, from `scripts/render-app-icon.sh`), copied by `scripts/package-app.sh`; no SPM resource bundle |
 | Settings | `~/.config/soprano-cast/settings.json` (`$XDG_CONFIG_HOME/soprano-cast/` when set); `SOPRANO_CAST_CONFIG` overrides the path |
 | App state | `UserDefaults` (injectable): usage records, search history; `UserDefaults.standard` `didRequestPermissions` (first-launch prompt) |
 | CLI port | CFMessagePort `<bundle id>.cli` |
@@ -38,7 +38,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 |---|---|---|
 | `Sources/SopranoCastCore/` | Core | Pure logic, Foundation + CoreGraphics only, no AppKit, everything `public`: items, keys and hotkeys (parsing, recorder, gesture detection, conflicts), settings, search and ranking, calculator, quicklink templates, script metadata, window layout math, launcher key routing and list navigation, CLI messages. |
 | `Sources/SopranoCastCore/Vendored/JSONCText.swift` | — | Copied from Soprano by `scripts/sync-soprano-chrome.sh`. Never edit. |
-| `Sources/SopranoCast/Vendored/` | — | Soprano chrome (RetroChrome, Theme, NSColor+Hex, AppVersion, FileSystemWatcher). Never edit. |
+| `Sources/SopranoCast/Vendored/` | — | Soprano chrome (Chrome, Theme, NSColor+Hex, AppVersion, FileSystemWatcher). Never edit. |
 | `Sources/SopranoCast/System/` | System | App catalog, System Settings pane catalog, icons, app/quicklink/system/script/pane execution, window manager, hotkey center + Hyper key. |
 | `Sources/SopranoCast/Launcher/` | Launcher | `LauncherController` and `LauncherWindow` (panel, search bar, list, footer, overlays, HUD). |
 | `Sources/SopranoCast/App/`, `Shell/` | Shell | `main.swift`, app delegate (composition root), menu bar, login item, settings/theme centers, app state store, permissions window, CLI. |
@@ -62,9 +62,9 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 
 | Owner | Files |
 |---|---|
-| Infra | `Package.swift`, `.gitignore`, `LICENSE`, `Support/*`, `scripts/*`, `Sources/SopranoCast/Resources/`, both `Vendored/` dirs, `App/SopranoResources.swift` |
+| Infra | `Package.swift`, `.gitignore`, `LICENSE`, `Support/*`, `scripts/*`, `Sources/SopranoCast/Resources/`, both `Vendored/` dirs |
 | Core keys | `Core/KeyParsing.swift`, `Core/HotkeyParsing.swift`, `Core/HotkeyRecorder.swift`, `Core/HotkeyRecordingSession.swift`, `Core/ModifierGestureDetector.swift`, `Core/HotkeyConflicts.swift`; tests `KeyParsingTests`, `HotkeyParsingTests`, `HotkeyRecorderTests`, `HotkeyRecordingSessionTests`, `ModifierGestureDetectorTests`, `HotkeyConflictsTests` |
-| Core settings | `Core/SettingsResolver.swift`, `Core/SettingsTemplate.swift`, `Core/SettingsEditor.swift`, `Core/SettingsChanges.swift`, `Core/ExtensionsTable.swift`; tests `SettingsResolverTests`, `SettingsTemplateTests`, `SettingsEditorTests`, `ExtensionsTableTests` |
+| Core settings | `Core/SettingsResolver.swift`, `Core/SettingsTemplate.swift`, `Core/SettingsEditor.swift`, `Core/SettingsChanges.swift`, `Core/ExtensionsTable.swift`, `Core/SopranoThemeSettings.swift`; tests `SettingsResolverTests`, `SettingsTemplateTests`, `SettingsEditorTests`, `ExtensionsTableTests`, `SopranoThemeSettingsTests` |
 | Core search | `Core/SearchMatcher.swift`, `Core/Ranker.swift`, `Core/Frecency.swift`, `Core/SearchHistory.swift`, `Core/Calculator.swift`; tests `SearchMatcherTests`, `RankerTests`, `FrecencyTests`, `SearchHistoryTests`, `CalculatorTests` |
 | Core commands | `Core/BuiltinItems.swift`, `Core/ItemActions.swift`, `Core/QuicklinkTemplate.swift`, `Core/ScriptMetadataParser.swift`, `Core/ScriptOutput.swift`, `Core/WindowLayout.swift`, `Core/SettingsPanes.swift`; tests `BuiltinItemsTests`, `ItemActionsTests`, `QuicklinkTemplateTests`, `ScriptMetadataParserTests`, `ScriptOutputTests`, `WindowLayoutTests`, `SettingsPanesTests` |
 | Core launcher | `Core/LauncherKeyRouter.swift`, `Core/ResultNavigator.swift`; tests `LauncherKeyRouterTests`, `ResultNavigatorTests` |
@@ -74,7 +74,7 @@ The `ld: warning: building for macOS-14.0 …` link warnings are expected.
 | System hotkeys | `System/HotkeyCenter.swift`, `System/CarbonHotkeys.swift`, `System/ModifierTap.swift`, `System/KeyboardLayout.swift`, `System/HyperKeyController.swift`, `System/KeyEventConversion.swift`; tests `KeyboardLayoutTests`, `KeyEventConversionTests` |
 | Launcher views | `Launcher/LauncherWindow.swift`, `Launcher/LauncherPanel.swift`, `Launcher/SearchBarView.swift`, `Launcher/ResultListView.swift`, `Launcher/FooterView.swift`, `Launcher/OverlayViews.swift`, `Launcher/HUDWindow.swift`; tests `LauncherWindowTests` |
 | Launcher controller | `Launcher/LauncherController.swift`, `Launcher/LauncherModelBuilder.swift`; tests `LauncherControllerTests`, `LauncherModelBuilderTests`, `LauncherTestSupport` |
-| Shell | `main.swift`, `App/AppDelegate.swift`, `App/MenuBarController.swift`, `App/LoginItem.swift`, `App/CLIServer.swift`, `App/CLIClient.swift`, `Shell/SettingsFile.swift`, `Shell/SettingsCenter.swift`, `Shell/ThemeCenter.swift`, `Shell/AppStateStore.swift`, `Shell/Permissions.swift`, `Shell/PermissionsWindowController.swift`; tests `SettingsCenterTests`, `AppStateStoreTests`, `CLIRoundTripTests`, `PermissionsWindowTests` |
+| Shell | `main.swift`, `App/AppDelegate.swift`, `App/MenuBarController.swift`, `App/CastGlyph.swift`, `App/LoginItem.swift`, `App/CLIServer.swift`, `App/CLIClient.swift`, `Shell/SettingsFile.swift`, `Shell/SettingsCenter.swift`, `Shell/ThemeCenter.swift`, `Shell/AppStateStore.swift`, `Shell/Permissions.swift`, `Shell/PermissionsWindowController.swift`; tests `SettingsCenterTests`, `ThemeCenterTests`, `AppStateStoreTests`, `CLIRoundTripTests`, `PermissionsWindowTests`, `CastGlyphTests` |
 | Settings | `Settings/SettingsWindowController.swift`, `Settings/SettingsChrome.swift`, `Settings/GeneralSettingsPane.swift`, `Settings/ExtensionsSettingsPane.swift`, `Settings/AdvancedSettingsPane.swift`; tests `SettingsWindowTests` |
 | Fixtures | `Fixtures/FixtureCatalog.swift`, `Fixtures/FixtureIcons.swift`, `Fixtures/FixtureRunner.swift`, `Fixtures/FixtureHotkeys.swift`, `Fixtures/FixturePresenterSupport.swift`, `Fixtures/SnapshotCommand.swift`; tests `FixtureCatalogTests`, `SnapshotCommandTests` |
 
@@ -154,6 +154,16 @@ extension HotkeySpec {
     public var keycaps: [String] { get }
     /// Shape names for messages: "⇧⌘K".
     public var displayString: String { get }
+    /// Keycap rule K1, what every view draws: one cap per chord step. A combo, a modifier
+    /// tap or both sides is one cap ("⇧⌘K", "✦1", "R⌘", "L⌘ R⌘"); a double tap two ("⌘",
+    /// "⌘"). `caps(fromKeycaps:)` groups keycaps laid out like `keycaps` (the layout's).
+    public var caps: [String] { get }
+    public func caps(fromKeycaps parts: [String]) -> [String]
+}
+public enum Keycaps {
+    /// One chord step as one legend; a multi-character modifier ("fn", "L⌘") is set off
+    /// by spaces: ["⇧","⌘"] + "K" → "⇧⌘K", ["fn"] + "A" → "fn A", ["⌥","R⌘"] → "⌥ R⌘".
+    public static func chord(modifiers: [String], key: String? = nil) -> String
 }
 ```
 
@@ -190,7 +200,11 @@ replaces `recorded`.
 public struct HotkeyRecordingSession: Sendable {
     public static let countdownMilliseconds: Int   // 1500
     public static let tickMilliseconds: Int        // 100
-    public enum Keys: Equatable, Sendable { case spec(HotkeySpec), display([String]) }
+    public enum Keys: Equatable, Sendable {
+        case spec(HotkeySpec), display([String])
+        /// K1 caps: a spec through `caps`, held modifiers as one chord cap.
+        public func caps(_ caps: (HotkeySpec) -> [String]) -> [String]
+    }
     public enum Step: Equatable, Sendable {
         case none, redraw, startCountdown, save(HotkeySpec, takingFrom: HotkeyTarget?), clear, close
     }
@@ -261,6 +275,15 @@ public enum SettingsResolver {
     /// JSONC → settings over the defaults; unknown keys and bad values warn (dotted paths),
     /// a non-object document gives settings == nil and one .error with its line.
     public static func resolve(text: String, knownThemeIDs: Set<String>) -> SettingsResolution
+}
+/// Soprano's settings.json as Cast's `theme: "soprano"` reads it (`SopranoThemeSettings.swift`):
+/// `theme` as written (nil when missing or not a string), `appearance` system | light | dark
+/// (system when missing or unknown); nil when the document is not a JSON object.
+public enum SopranoAppearance: String, CaseIterable, Sendable { case system, light, dark }
+public struct SopranoThemeSettings: Equatable, Sendable {
+    public var theme: String?
+    public var appearance: SopranoAppearance
+    public static func read(text: String) -> SopranoThemeSettings?
 }
 public enum SettingsTemplate {
     /// The commented settings.json written on first launch; resolves to `.defaults`, no issues.
@@ -729,6 +752,8 @@ enum KeyboardLayout {      // main thread only
     /// for `key:'`), else `KeySpec.symbol`; `keycaps(for:)` applies it to a combo's key.
     static func keycapSymbol(for key: KeySpec) -> String
     static func keycaps(for spec: HotkeySpec) -> [String]
+    /// `spec.caps(fromKeycaps: keycaps(for: spec))`: "⌘1", "⇧⌘Ä".
+    static func caps(for spec: HotkeySpec) -> [String]
 }
 ```
 
@@ -769,8 +794,9 @@ never starts its sources).
   `NSWorkspace.open` of the `x-apple.systempreferences:<bundle id>` URL or the prefPane
   file.
 - **Icons**: image and PDF files drawn as themselves, other files' icons from
-  `NSWorkspace.icon(forFile:)`, emoji drawn into an image, glyphs from SF Symbols tinted
-  with the theme accent on a `bgRaised` tile, remote icons fetched once into
+  `NSWorkspace.icon(forFile:)`, emoji drawn into an image, glyphs as Folio glyph tiles
+  (`LiveIconProvider.glyphTileImage`: SF Symbol Regular in `textMuted` on a `glyphTile`
+  square, radius 5), remote icons fetched once into
   `~/Library/Caches/com.soprano.cast/icons/` (the script glyph until loaded, and for the
   session after a failure); all cached per (icon, size, theme for glyphs).
 - **System commands**: lockScreen = `SACLockScreenImmediate` (login.framework via dlsym),
@@ -908,8 +934,8 @@ struct LauncherStateSnapshot: Equatable {   // defined by the controller
 }
 struct LauncherToast: Equatable { var text: String; var isError: Bool }   // LauncherModelBuilder.swift
 enum LauncherModelBuilder {
-    static func model(theme:query:sections:selectedIndex:arguments:argumentValues:focus:toast:overlay:settings:icon:keycaps:) -> LauncherViewModel
-    static func fallbacksTitle(query: String) -> String   // use “<query>” with…
+    static func model(theme:query:sections:selectedIndex:arguments:argumentValues:focus:toast:overlay:settings:icon:caps:) -> LauncherViewModel
+    static func fallbacksTitle(query: String) -> String   // Use “<query>” with…
 }
 ```
 
@@ -935,7 +961,7 @@ Controller behavior:
 - **runSecondary/runTertiary/runAction** → `ItemActions` lookups → `runner.perform` or the
   settings actions below; runner actions record neither usage nor history. Action Panel:
   heading = the item title; lists `ItemActions.actions` for the selection, filtered by its
-  text (`SearchMatcher`; "no results" when nothing matches), ↵ runs the selected one;
+  text (`SearchMatcher`; "No results" when nothing matches), ↵ runs the selected one;
   Configure Command (heading "Configure Command") opens `configureActions` in the same
   panel. Favorites, disable and configure ignore the calculator row.
 - **Settings actions** (all through `environment.editSettings`; the settings center reloads
@@ -943,7 +969,7 @@ Controller behavior:
   appends/removes in `favorites`; moveFavoriteUp/Down swaps; disableCommand adds to
   `disabled` (written sorted; toast "Disabled <title>"); setHotkey opens the recorder
   overlay over a `HotkeyRecordingSession` targeting the item (calls `hotkeys.suspend()`;
-  shows the current hotkey, "recording…" with none, held keycaps, then recorded keycaps with
+  shows the current hotkey, "Recording…" with none, held modifiers as one cap, then the recorded hotkey with
   the owner in red ("Used by <title>", or the raw id when the item is gone; "Used by Soprano
   Cast" for the launcher's own hotkey, which gets no countdown and can't be saved);
   `.startCountdown` runs `countdownMilliseconds` with a bar advanced every
@@ -975,13 +1001,15 @@ Controller behavior:
 - Shows on `environment.screenFrame(settings.launcher.screen)`; `onResignKey` hides when
   `closeOnFocusLoss`. Mouse: a click selects a row, a double click runs it, clicking an
   action runs it.
-- Model: placeholder "Search for apps and commands…"; section headers "calculator",
-  "favorites", "suggestions", "results" and `use “<query>” with…` for fallbacks; row
+- Model: placeholder "Search for apps and commands…"; section headers (sentence case, the
+  eyebrow capitalizes them) "Calculator", "Favorites", "Suggestions", "Results" and
+  `Use “<query>” with…` for fallbacks; row
   accessory = `ItemKind.label` ("Application", "Command" for system, window, System
   Settings and Soprano Cast commands, "Quicklink", "Script Command"; calculator: the expression and no
   subtitle; scripts: their package name, no subtitle); fallback rows show `“<query>”` as
-  the subtitle and no argument fields; alias badge; hotkey keycaps
-  (`KeyboardLayout.keycaps(for:)`); footer primary title from `ItemActions.primary` (only
+  the subtitle and no argument fields; alias badge; hotkey as K1 caps
+  (`KeyboardLayout.caps(for:)`, action shortcuts `HotkeySpec.caps`, the recorder
+  `HotkeyRecordingSession.Keys.caps(_:)`); footer primary title from `ItemActions.primary` (only
   with a selection); empty text "No results" with a query, "Type to search apps and
   commands" without.
 
@@ -991,9 +1019,10 @@ Controller behavior:
   (arguments after it); `toggle`, `open`, `list`, `help`, `--help` →
   `CLIClient.run(arguments:)` (command word included); both exit. Anything else starts
   the GUI with `.accessory` policy and `AppDelegate`.
-- `AppDelegate` (composition root): forces `.darkAqua`, registers the bundled font;
-  single-instance guard (a second instance terminates); `SettingsCenter.shared.start()`;
-  `ThemeCenter.shared.start()`; `LiveAppCatalog`, `LiveSettingsPaneCatalog`, `ScriptCatalog` (sharing the
+- `AppDelegate` (composition root): leaves `NSApp.appearance` unset (each window takes
+  the resolved theme's); single-instance guard (a second instance terminates);
+  `SettingsCenter.shared.start()`; `ThemeCenter.shared.start()`; `LiveAppCatalog`,
+  `LiveSettingsPaneCatalog`, `ScriptCatalog` (sharing the
   `ScriptRunner`), `LiveIconProvider`, `LiveWindowManager`, `SystemCommandRunner`,
   `LiveItemRunner` (cast commands: openSettings → the settings window,
   reloadScripts → HUD "Reloaded script directories", quit), `HotkeyCenter`,
@@ -1026,7 +1055,8 @@ Controller behavior:
   differ), `itemsDidChange()` (the controller's `onItemsChange`) and `themeDidChange()`.
   Tabs: General (settings.json card with issue rows, Open settings.json, Reveal in Finder;
   `app.startAtLogin`, `launcher.hotkey`, `app.showMenuBarIcon`, `theme` ("Follow Soprano"
-  = "soprano"); `favorites` and `fallbacks` with ↑ ↓ ✕), Extensions (`ExtensionsTable` with
+  = "soprano", then `AppTheme.options`: Folio, Folio Paper, Folio Ink and the seven dark
+  themes); `favorites` and `fallbacks` with ↑ ↓ ✕), Extensions (`ExtensionsTable` with
   collapsible groups and a filter; alias field, hotkey keycaps (click records) and Enabled
   box per row; the detail pane writes alias, hotkey, `disabled`, `favorites`, `fallbacks`,
   quicklinks (`.quicklink` edits; Create picks `QuicklinkID.make`; Delete also drops the
@@ -1051,12 +1081,20 @@ Controller behavior:
   debounce. `SettingsCenter` gains `edit(_ edit: SettingsEdit) throws` (via
   `SettingsEditor`, starting from the template when the file is missing) and
   `openInEditor()` (TextEdit when nothing opens JSON); an unreadable file is one error
-  "Could not read <path>: …" and the last good settings stay. `ThemeCenter` follows
-  Soprano's settings (`SOPRANO_CONFIG` > `$XDG_CONFIG_HOME/soprano/` > `~/.config/soprano/`).
+  "Could not read <path>: …" and the last good settings stay.
+- `ThemeCenter` resolves Cast's `theme` to a palette (`ThemeCenter.resolve(themeID:soprano:system:)`):
+  `"soprano"` reads Soprano's `theme` and `appearance` (`SopranoThemeSettings`, file
+  `SOPRANO_CONFIG` > `$XDG_CONFIG_HOME/soprano/` > `~/.config/soprano/`, watched live) and
+  resolves Soprano's theme with Soprano's appearance when it is `light`/`dark`, else the
+  system's; any other id resolves with the system appearance. `folio` and unknown ids give
+  Folio Paper or Folio Ink (`AppTheme.theme(for:appearance:)`); pinned and third-party ids
+  ignore the appearance. The system appearance is `NSApp.effectiveAppearance`, observed
+  with KVO (`systemAppearanceDidChange()`); observers fire only when the resolved palette
+  changes. Known ids for the resolver: `ThemeCenter.knownThemeIDs` (`AppTheme.options`).
 - `AppStateStore(defaults: UserDefaults = .standard)`: usage records and search history as
   JSON data under `castUsage` / `castHistory` (unreadable data → empty).
-- `MenuBarController(controller:settings:hotkeyProblems:openPermissions:openSettings:)`: status item (18 pt
-  programmatic template icon: a square with a slanted beam, tooltip "Soprano Cast"), menu:
+- `MenuBarController(controller:settings:hotkeyProblems:openPermissions:openSettings:)`: status item (16 pt
+  template icon `CastGlyph.templateImage()`: a search field with a lens and a caret, 1.5 pt strokes; tooltip "Soprano Cast"), menu:
   "Open Soprano Cast" (`show()`; the launcher hotkey as key equivalent, or appended as
   keycaps after two spaces for modifier gestures, fn combos and physical keys the layout
   types nothing with), "Settings…" (⌘,; the settings window), a disabled "settings.json: N warning(s)" line
@@ -1100,7 +1138,8 @@ Git, Soprano Tab, Slack, Mail, Notes, Music, Finder, System Settings, Xcode, Asi
 WhatsApp; Chrome, Soprano, Slack and Finder running — plus 3 script commands: "Keep Awake"
 silent, "Search Issues" compact with a required "query" argument, "Disk Usage"
 fullOutput — plus 5 System Settings panes: Bluetooth, Displays, Keyboard, Sound, Wi‑Fi
-with keyword "Wi-Fi"), `FixtureIcons` (square letter tiles, glyph drawings, emoji tiles),
+with keyword "Wi-Fi"), `FixtureIcons` (rounded letter tiles for apps, the theme's Folio
+glyph tiles, emoji on a glyph tile),
 `FixtureRunner` (records `run <id> "<arg>"` / `perform <action> <id>`, returns scripted
 outcomes), `FixtureHotkeys` (records "setBindings N", "suspend", "resume"). Fixed `now`
 (2026-10-19 12:00 UTC), usage (Chrome, Soprano, Slack used) and history ("slack",
@@ -1111,9 +1150,13 @@ offscreen (no Dock icon, no state; settings default to `SettingsTemplate.text`, 
 visible frame is the screen minus a 33 pt menu bar), shows the launcher, types `--query`
 through `onQueryChange`, replays `--keys` through `onKeyEvent` (keys the launcher doesn't
 consume type into the focused field; replay stops once the launcher closes), and writes
-`renderSnapshot` at 2× over a backdrop. With `--settings-window <tab>` it instead builds a
+`renderSnapshot` at 2× over a backdrop (Folio's wallpaper gradient in the theme's mode and
+a menu bar strip). Fixture themes never read the system or Soprano: `FixtureTheme.resolve`
+draws `soprano` and `folio` as Folio Paper, so `--theme folio-ink` renders Ink; the app
+appearance follows the fixture theme. With `--settings-window <tab>` it instead builds a
 `SettingsWindowController` on the same fixtures (items from an offscreen controller, folder
-picks return "~/Scripts"), shows the tab, applies `--filter` and `--select` (Extensions),
+picks return "~/Scripts"), shows the tab, applies `--filter` and `--select` (Extensions;
+a selected row takes the keyboard, like a click),
 opens the recorder for `--record` (`launcher` or an item id), replays `--keys` into it and
 writes `renderImage` (1120 × 700 at 2×). Usage, verbatim:
 
@@ -1158,60 +1201,82 @@ the PNG path.
 
 ## Visual design
 
-Vendored chrome only: `ThemeColors` tokens (+ `bgSelected`, `bgSelectedStrong`,
-`railMuted`), `RetroFont.display(11 | 22)` for labels (small caps; never uppercase by hand),
-`RetroFont.body(size)` for text, square corners, `RetroLamp` the only round chrome,
-`RetroRuleView`, `RetroStripeView`. Appearance forced to `.darkAqua`.
+Vendored Folio chrome only (`Chrome.swift`, `Theme.swift`; spec in Soprano's
+`docs/design/2026-10-21-calm-family/b/`): `ThemeColors` and its derived tokens (`raised`,
+`hover`, `selection`, `selectionMuted`, `matchOnSelection`, `fieldFocusEdge`, `glyphTile`,
+`textSelection`, `scrim`, `keycapFill/Edge`, `shadowE2/E3`), system fonts through
+`ChromeFont` (New York for titles ≥ 15 pt, SF Pro, SF Mono), radii `Chrome.Radius` (panel
+12, popover 10, card 8, control 6, cap 4). Model strings are sentence case; eyebrows are
+uppercased in the view. Keycaps follow K1 (one cap per chord: `⌘1`, `⇧⌘C`; a double tap is
+two caps). Accent only on the caret, the pencil tick and matches on the selected row. Every
+window takes `theme.appearance.nsAppearance`.
 
-- **Panel** 750 × 474, `bgBase` at 0.98, 1 pt `borderStrong`, shadow; borderless,
-  non-activating `NSPanel` that becomes key (text input without activating the app), level
-  `.modalPanel`, `[.canJoinAllSpaces, .fullScreenAuxiliary, .transient]`.
-- **Search bar** 56 high: query field body 18 `textPrimary`, placeholder `textMuted`;
-  argument fields inline after the text (bordered boxes, body 14, 150 wide, dropdowns as
-  pop-up menus), the focused one framed in `accent`; `borderSubtle` hairline below.
-- **List**: section headers display 11 `textMuted` ("favorites", "results") with a rule;
-  rows 40 high: 24 pt icon, title body 14 (matched characters `accent`), subtitle body 12
-  `textMuted`, alias badge (display 11 chip, `bgRaised`, `borderSubtle`), trailing accessory
-  body 12 `textMuted`; the selected row: `bgSelectedStrong` + 2 pt `accent` leading rail and
-  its hotkey keycaps before the accessory. Scrolls to keep the selection visible.
-- **Footer** 40 high, `bgPanel`, hairline on top: left a small `RetroStripeView` + "soprano
-  cast" (display 11) or the toast (body 12; `danger` when an error); right the primary
-  title (body 12) + "↵" keycap, a separator, "actions" + "⌘" "K" keycaps.
-- **Action Panel**: a 360-wide card anchored to the bottom-right above the footer:
-  heading (the item title, or "Configure Command", display 11 `textMuted`), rows 32 high
-  (title body 13, keycaps right — ↵ on the primary, ⌘↵ on the secondary — destructive in
-  `danger`), a filter field at the bottom ("search for actions…"), "no results" when the
-  filter matches nothing.
-- **Recorder**: a centered card: the item title, keycaps in display 22 ("recording…" with
-  none), the conflict line in `danger`, a 2 pt `accent` countdown bar, hint "⌫ clear · ⎋
-  cancel · ↵ save" (display 11).
-- **Alias editor**, **confirmation**: centered cards; the alias field's placeholder
-  "alias"; the confirmation shows the item title and "Are you sure?" with `RetroButton`s
-  "cancel ⎋" and "<item title> ↵" (prominent, `danger`); clicking them sends ⎋ / ↵.
-- **Output**: replaces the list; title row (display 11; `danger` on error), body 12 text
-  view, selectable.
-- **HUD**: a borderless panel 1/6 up from the display bottom, `bgRaised`, `borderStrong`,
-  display 11 text, fades out after 1.5 s.
-- **Empty**: display 22 `textMuted` centered in the list area.
+- **Panel** 750 × 474: `raised`, 1 pt `borderSubtle`, radius 12, clipped; e3 shadow
+  (window shadow live, `shadowE3` in snapshots); borderless, non-activating `NSPanel` that
+  becomes key (text input without activating the app), level `.modalPanel`,
+  `[.canJoinAllSpaces, .fullScreenAuxiliary, .transient]`.
+- **Search bar** 56 high, 20 pt inset: query SF Pro 20 `textPrimary`, placeholder
+  `textMuted`, caret accent; argument fields inline after the text (Folio fields: `raised`,
+  `borderStrong`, radius 6, 26 high, SF 13, 150 wide, dropdowns as pop-up menus), the
+  focused one edged in `fieldFocusEdge`; `borderSubtle` hairline below.
+- **List** (inset 6/8): section headers 26 high, eyebrows (SF 11 Semibold, UPPERCASE,
+  `textMuted`, no rule; a quoted query stays verbatim at Medium: `USE “chr” WITH…`), 6 pt
+  above a header that follows a row; rows 40 high, radius 6: 24 pt icon, title SF 13
+  (matches Semibold, `textPrimary`, `matchOnSelection` on the selected row only), alias chip
+  (SF 11 muted, radius 4), subtitle meta (SF Mono 11 for paths), trailing K1 hotkey caps
+  (selected row only) and the accessory (meta). The selected row is the `selection` pill
+  with the 2 × 14 pencil tick while Root Search has the keyboard, `selectionMuted` without
+  tick behind an overlay; hover is the `hover` pill. Built-in commands sit on glyph tiles
+  (24 pt, radius 5, `glyphTile`, 16 pt Regular symbol in `textMuted`). Scrolls to keep the
+  selection visible.
+- **Footer** 40 high on the panel surface, `borderSubtle` hairline on top, insets 20 / 12:
+  left the Cast glyph (14 pt, `textMuted`) + "Soprano Cast" (SF 12 muted) or the toast
+  (SF 12; `danger` when an error); right the primary title (SF 12 ink) + `↵` cap, a 1 × 16
+  separator, "Actions" (muted) + one `⌘K` cap.
+- **Action Panel** (`.menu`): a 360-wide card (`raised`, `borderSubtle`, radius 10, e2,
+  5 pt padding) anchored to the bottom-right above the footer: heading (the item title, or
+  "Configure Command", meta muted), rows 30 high (SF 13, K1 caps right — ↵ on the primary,
+  ⌘↵ on the secondary — destructive in `danger`; the selected one a pill with the pencil
+  tick), a filter field at the bottom ("Search for actions…"), "No results" when the filter
+  matches nothing.
+- **Recorder** (`.dialog`): a centered card (380 wide, padding 20): the item title (New
+  York 17 Medium), the keys as 36 pt caps (SF 20 Medium; "Recording…" in New York italic
+  muted with none), the conflict line (SF 12 `danger`), a 2 pt `textMuted` countdown bar,
+  hints `⌫` Clear · `esc` Cancel · `↵` Save (16 pt muted caps + meta).
+- **Alias editor**, **confirmation**: centered dialog cards with New York 17 titles; the
+  alias field (Folio field, placeholder "alias", error in `danger`); the confirmation shows
+  the item title and "Are you sure?" (SF 13 muted) with `ChromeButton`s "Cancel" + `esc`
+  (standard) and "<item title>" + `↵` (danger); clicking them sends ⎋ / ↵.
+- **Output**: replaces the list; title row (SF 13 Medium; `danger` on error) over an SF
+  Mono 12 / 18 text view, selectable (`textSelection`).
+- **HUD** (`.hud`): a borderless panel 1/6 up from the display bottom, 36 high, `raised`,
+  `borderSubtle`, radius 10, e2, SF 13; fades out over 200 ms after 1.5 s (at once under
+  Reduce Motion).
+- **Empty**: New York italic 17 `textMuted` centered in the list area.
+- **Menu-bar icon**: `CastGlyph` (Folio `.tpl`), 16 pt template, 1.5 pt strokes.
 - **Settings window** 1120 × 700 (minimum 1000 × 560), titled "Soprano Cast Settings",
-  `bgBase`: a 180 pt `bgPanel` sidebar (`borderStrong` hairline) of 34 pt tab keys (SF
-  Symbol + display 11 title; the active one a lit `accent` block with `bgPanel` ink) and a
-  status line at its bottom (body 11, `danger` for errors, gone after 4 s). General and
-  Advanced use Soprano's settings column (≤ 660 wide): tab header (display 22 + body 11),
-  sections as a lowercase `RetroHeadingView` over a `bgPanel` card with a `borderStrong`
-  hairline and 30 pt rows (display 11 label left, control right, `borderSubtle` hairlines
-  between), issue rows tinted `yellow` / `danger`, `RetroButton`s, keycap chips (20 high,
-  `bgRaised`, `borderStrong`, display 11; `accent` edges on hover; "record hotkey" muted
-  when empty). Extensions: a 52 pt top bar (search field 260 wide, "N commands" display 11
-  right), column titles (display 11 `textMuted`) over a hairline, the table (group rows 28
-  high on `bgPanel` with a chevron, display 11 title and body 11 count; command rows 32
-  high: 18 pt icon + body 13 title, muted when disabled; type body 12 `textMuted`; alias
-  body 12 `accent`; keycaps; Enabled checkbox; "add alias" and "record" show on the
-  selected row only, which is `bgSelectedStrong` with a 2 pt `accent` rail), and a 320 pt
-  detail pane after a `borderStrong` rule (32 pt icon, body 15 title, display 11 type, body
-  11 subtitle and id, cards with 140 pt controls; destructive keys framed and inked in
-  `danger`). The recorder dims the window with `bgBase` at 0.72 under the launcher's
-  `RecorderCardView`.
+  `bgBase`: a 180 pt `bgPanel` sidebar (`borderSubtle` rule; padding 12 / 10, gap 2) of
+  30 pt nav items (14 pt SF Symbol + SF 12; hover the `hover` pill; active the raised pill
+  with a `borderSubtle` edge and ink Medium text) and a status line at its bottom (meta,
+  `danger` for errors, gone after 4 s). General and Advanced use the settings column
+  (≤ 660 wide): title New York 22 + meta subtitle, sections as eyebrows over cards
+  (`raised`, `borderSubtle`, radius 8) with rows ≥ 36 (SF 13 label left, control right,
+  inset `borderSubtle` separators), switches for booleans, native pop-ups, Folio fields,
+  `ChromeButton`s, K1 keycap controls ("Record hotkey" muted when empty), issue rows as
+  status washes with a status mark. Extensions (`b/cast-settings.html`): one 52 pt bar
+  ("Extensions" New York 22 + "N commands" meta tabular left, a 260 pt search field right),
+  eyebrow column heads over a hairline, the table (group rows 28 high on `bgBase`: chevron,
+  SF 12 Semibold title, count; command rows 32 high: the selection pill with the pencil
+  tick while the table holds the keyboard (the muted pill otherwise), the hover pill under
+  the pointer, 18 pt icon +
+  SF 13 title, type and alias SF 12 muted, small K1 caps, quiet checkbox; "add alias" and
+  "Record" show on the selected row only; visible scroller), and a 320 pt detail pane after
+  a `borderStrong` rule (32 pt icon, New York 17 title, meta type, SF Mono 11 subtitle and
+  id, eyebrow + card rows with 140 pt controls and switches; Save ink, Delete danger). The
+  recorder dims the window with `scrim` under the launcher's `RecorderCardView`.
+- **Permissions window** 560 × 130: "Permissions" (New York 17), an Accessibility row with
+  a status mark (success dot when granted, danger diamond when missing), SF 13 name, meta
+  detail and "Open System Settings" (ink when missing).
 
 ## Tests
 

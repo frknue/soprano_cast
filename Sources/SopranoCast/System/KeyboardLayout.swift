@@ -58,6 +58,11 @@ enum KeyboardLayout {
         return keycaps
     }
 
+    /// The K1 caps of `keycaps(for:)`: "⌘1" for ⌘ + the key that types 1 on this layout.
+    static func caps(for spec: HotkeySpec) -> [String] {
+        spec.caps(fromKeycaps: keycaps(for: spec))
+    }
+
     /// The 'uchr' data of the current keyboard layout. Input methods without one (some
     /// CJK input sources) fall back to the ASCII-capable layout they type through.
     private static func currentLayoutData() -> Data? {

@@ -14,13 +14,9 @@ let package = Package(
             name: "SopranoCast",
             dependencies: ["SopranoCastCore"],
             path: "Sources/SopranoCast",
-            exclude: ["Vendored/SOPRANO_COMMIT"],
-            resources: [
-                .copy("Resources/DepartureMono-Regular.woff2"),
-                .copy("Resources/AppIcon.icns"),
-            ],
+            // The app icon ships from the repo path (scripts/package-app.sh), not a bundle.
+            exclude: ["Vendored/SOPRANO_COMMIT", "Resources/AppIcon.icns"],
             linkerSettings: [
-                .linkedFramework("CoreText"),
                 .linkedFramework("CoreServices"),
                 .linkedFramework("ApplicationServices"),
                 .linkedFramework("Carbon"),

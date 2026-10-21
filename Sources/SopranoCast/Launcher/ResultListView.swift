@@ -1,12 +1,14 @@
 import AppKit
 import SopranoCastCore
 
-/// Root Search's sectioned list: section headers (display 11 with a rule) and 40 pt rows
-/// in a scroll view that keeps the selection visible, or the empty text centered. Row
-/// views are reused across updates; a selection or hover change only restyles them.
+/// Root Search's sectioned list: eyebrow section headers and 40 pt rows in a scroll view
+/// that keeps the selection visible, or the empty text centered. Row views are reused
+/// across updates; a selection or hover change only restyles them.
 final class ResultListView: LauncherFlippedView {
     static let rowHeight: CGFloat = 40
-    static let headerHeight: CGFloat = 28
+    static let headerHeight: CGFloat = 26
+    /// Extra space above a header that follows a row.
+    static let headerGap: CGFloat = 6
     static let horizontalInset: CGFloat = 8
     static let verticalInset: CGFloat = 6
 
@@ -28,6 +30,7 @@ final class ResultListView: LauncherFlippedView {
     private let emptyLabel = LauncherText.label()
     private var rowIDs: [ItemID] = []
     private var selectedIndex: Int?
+    private var isFocused = true
     private var hoveredIndex: Int?
     /// The top of each section (its header, or its first row without one), keyed by the
     /// flat index of the section's first row.
@@ -54,8 +57,11 @@ final class ResultListView: LauncherFlippedView {
         fatalError("init(coder:) is not supported")
     }
 
-    func apply(sections: [SectionViewModel], selectedIndex: Int?, emptyText: String?, theme: AppTheme) {
+    /// `isFocused`: Root Search has the keyboard (pill and pencil tick on the selection;
+    /// a muted pill while an overlay holds it).
+    func apply(sections: [SectionViewModel], selectedIndex: Int?, isFocused: Bool, emptyText: String?, theme: AppTheme) {
         let colors = theme.colors
+        self.isFocused = isFocused
         let shown = sections.filter { !$0.rows.isEmpty }
         let ids = shown.flatMap { $0.rows.map(\.id) }
         let rowsChanged = ids != rowIDs
@@ -78,6 +84,10 @@ final class ResultListView: LauncherFlippedView {
         for section in shown {
             sectionTops[flatIndex] = y
             if !section.title.isEmpty {
+                if flatIndex > 0 {
+                    y += Self.headerGap
+                    sectionTops[flatIndex] = y
+                }
                 let header = document.headers[headerIndex]
                 header.frame = CGRect(x: Self.horizontalInset, y: y, width: width, height: Self.headerHeight)
                 header.configure(title: section.title, colors: colors)
@@ -90,6 +100,7 @@ final class ResultListView: LauncherFlippedView {
                     index: flatIndex,
                     frame: CGRect(x: Self.horizontalInset, y: y, width: width, height: Self.rowHeight),
                     isSelected: flatIndex == selectedIndex,
+                    isFocused: isFocused,
                     isHovered: flatIndex == hoveredIndex,
                     theme: theme
                 )
@@ -103,10 +114,10 @@ final class ResultListView: LauncherFlippedView {
         }
 
         if ids.isEmpty, let emptyText {
-            let font = RetroFont.display(22)
+            let font = ChromeFont.empty
             emptyLabel.isHidden = false
-            emptyLabel.attributedStringValue = RetroText.display(
-                emptyText, color: colors.textMuted, size: 22, alignment: .center
+            emptyLabel.attributedStringValue = ChromeText.attributed(
+                emptyText, font: font, color: colors.textMuted, alignment: .center
             )
             emptyLabel.frame = LauncherText.lineFrame(
                 minX: Self.horizontalInset, maxX: bounds.width - Self.horizontalInset, centerY: bounds.midY, font: font
@@ -182,19 +193,17 @@ final class ResultListDocumentView: HoverContainerView {
 
 // MARK: - Section header
 
-/// A section title in display 11 `textMuted` followed by a `borderSubtle` rule.
+/// A section heading: an eyebrow (SF 11 Semibold, UPPERCASE, muted, no rule). A quoted
+/// query in the title (`Use “chr” with…`) keeps its case at Medium weight.
 final class SectionHeaderView: LauncherFlippedView {
     static let leadingInset: CGFloat = 12
 
     private let label = LauncherText.label()
-    private let rule = RetroRuleView(axis: .horizontal, style: .single)
     private(set) var title = ""
 
     init() {
         super.init(frame: .zero)
-        rule.translatesAutoresizingMaskIntoConstraints = true
         addSubview(label)
-        addSubview(rule)
     }
 
     @available(*, unavailable)
@@ -204,40 +213,51 @@ final class SectionHeaderView: LauncherFlippedView {
 
     func configure(title: String, colors: ThemeColors) {
         self.title = title
-        label.attributedStringValue = RetroText.display(title, color: colors.textMuted)
-        rule.color = colors.borderSubtle
-        // The title sits a little below the band's middle, close to the rows it heads.
-        let centerY = (bounds.height / 2 + 3).rounded()
+        label.attributedStringValue = Self.eyebrow(title, color: colors.textMuted)
         let maxX = bounds.width - Self.leadingInset
-        let labelWidth = min(LauncherText.width(of: label.attributedStringValue), max(0, maxX - Self.leadingInset))
         label.frame = LauncherText.lineFrame(
-            minX: Self.leadingInset, maxX: Self.leadingInset + labelWidth, centerY: centerY, font: RetroFont.display(11)
+            minX: Self.leadingInset, maxX: maxX, centerY: (bounds.height / 2).rounded(), font: ChromeFont.eyebrow
         )
-        let ruleX = label.frame.maxX + 8
-        rule.frame = CGRect(x: ruleX, y: centerY, width: max(0, maxX - ruleX), height: Retro.hairline)
-        rule.isHidden = rule.frame.width <= 0
+    }
+
+    /// The title uppercased, except a `“…”` quote, which stays verbatim at Medium weight.
+    static func eyebrow(_ title: String, color: NSColor) -> NSAttributedString {
+        guard let open = title.firstIndex(of: "“"), let close = title.lastIndex(of: "”"), open < close else {
+            return ChromeText.eyebrow(title, color: color)
+        }
+        let quoteEnd = title.index(after: close)
+        let string = NSMutableAttributedString(attributedString: ChromeText.eyebrow(String(title[..<open]), color: color))
+        string.append(ChromeText.attributed(
+            String(title[open..<quoteEnd]), font: ChromeFont.sans(size: 11, weight: .medium), color: color
+        ))
+        string.append(ChromeText.eyebrow(String(title[quoteEnd...]), color: color))
+        return string
     }
 }
 
 // MARK: - Row
 
-/// One result: 24 pt icon, title (matched characters in `accent`), alias badge, subtitle,
-/// and the trailing accessory; the selected row gets `bgSelectedStrong`, a 2 pt `accent`
-/// rail and its hotkey keycaps before the accessory. Text and icon are rebuilt only when
-/// the row's content changes.
+/// One result: 24 pt icon, title (SF 13; matches Semibold, in `matchOnSelection` on the
+/// selected row only), alias chip, subtitle (meta; SF Mono for paths) and the trailing
+/// hotkey caps and accessory. Selection is Folio's pill (+ pencil tick while Root Search
+/// has the keyboard); hover a `hover` pill. Text and icon are rebuilt only when the row's
+/// content changes.
 final class ResultRowView: LauncherFlippedView {
     static let iconSide: CGFloat = 24
-    static let railWidth: CGFloat = 2
     static let leadingInset: CGFloat = 12
     static let trailingInset: CGFloat = 12
-    static let keycapHeight: CGFloat = 20
+    static let gap: CGFloat = 12
+    static let keycapHeight: CGFloat = Chrome.keycapHeight
 
     private(set) var index = 0
     private(set) var itemID: ItemID?
     private(set) var isSelected = false
+    private(set) var isFocused = true
     private(set) var isHovered = false
     /// The keycaps showing (the selected row's hotkey; empty otherwise).
     var shownHotkeyKeys: [String] { keycaps.isHidden ? [] : keycaps.keys }
+    /// The title as drawn (match weight and color), for tests.
+    var titleText: NSAttributedString { titleLabel.attributedStringValue }
 
     var onClick: ((Int, Int) -> Void)?
 
@@ -247,9 +267,9 @@ final class ResultRowView: LauncherFlippedView {
     private let accessoryLabel = LauncherText.label()
     private let aliasChip = BadgeChipView()
     private let keycaps = KeycapRowView()
-    private let rail = LauncherFlippedView()
     private var content: Content?
-    private var colors = AppTheme.missionControl.colors
+    private var row: RowViewModel?
+    private var colors = AppTheme.folioPaper.colors
     private var hasAlias = false
 
     /// What the row shows apart from selection and hover; a change rebuilds text and icon.
@@ -280,7 +300,6 @@ final class ResultRowView: LauncherFlippedView {
         addSubview(accessoryLabel)
         addSubview(aliasChip)
         addSubview(keycaps)
-        addSubview(rail)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
     }
@@ -295,6 +314,7 @@ final class ResultRowView: LauncherFlippedView {
         index: Int,
         frame: CGRect,
         isSelected: Bool,
+        isFocused: Bool,
         isHovered: Bool,
         theme: AppTheme
     ) {
@@ -302,6 +322,8 @@ final class ResultRowView: LauncherFlippedView {
         itemID = row.id
         colors = theme.colors
         self.isSelected = isSelected
+        self.isFocused = isFocused
+        self.row = row
         self.isHovered = isHovered
         self.frame = frame
         let content = Content(
@@ -333,32 +355,46 @@ final class ResultRowView: LauncherFlippedView {
 
     private func applyContent(_ row: RowViewModel) {
         iconLayer.contents = LauncherText.cgImage(row.icon, side: Self.iconSide, scale: iconLayer.contentsScale)
-        titleLabel.attributedStringValue = LauncherText.title(
-            row.title, highlights: row.titleHighlights, font: RetroFont.body(14),
-            color: colors.textPrimary, highlight: colors.accent
+        let isPath = row.subtitle.hasPrefix("/") || row.subtitle.hasPrefix("~")
+        subtitleLabel.attributedStringValue = LauncherText.plain(
+            row.subtitle, font: isPath ? ChromeFont.monoSmall : ChromeFont.meta, color: colors.textMuted
         )
-        subtitleLabel.attributedStringValue = LauncherText.plain(row.subtitle, font: RetroFont.body(12), color: colors.textMuted)
         accessoryLabel.attributedStringValue = LauncherText.plain(
-            row.accessory, font: RetroFont.body(12), color: colors.textMuted, alignment: .right
+            row.accessory, font: ChromeFont.meta, color: colors.textMuted, alignment: .right
         )
         hasAlias = !(row.alias ?? "").isEmpty
         aliasChip.configure(text: row.alias ?? "", colors: colors)
-        keycaps.configure(keys: row.hotkeyKeys, fontSize: RetroFont.grid, height: Self.keycapHeight, colors: colors)
+        keycaps.configure(keys: row.hotkeyKeys, colors: colors)
     }
 
-    /// Fill and rail: everything selection and hover change.
+    /// The pill and the title's match color: everything selection and hover change.
     private func applyState() {
-        let fill: NSColor = isSelected ? colors.bgSelectedStrong : (isHovered ? colors.bgOverlay : .clear)
-        layer?.backgroundColor = fill.cgColor
-        layer?.cornerRadius = Retro.cornerRadius
-        rail.isHidden = !isSelected
-        rail.layer?.backgroundColor = colors.accent.cgColor
+        if let row {
+            titleLabel.attributedStringValue = LauncherText.title(
+                row.title,
+                highlights: row.titleHighlights,
+                font: ChromeFont.row,
+                color: colors.textPrimary,
+                matchFont: ChromeFont.sans(size: 13, weight: .semibold),
+                matchColor: isSelected ? colors.matchOnSelection : colors.textPrimary
+            )
+        }
+        needsDisplay = true
+    }
+
+    /// The Folio row pill; the row frame already sits inside the list's inset.
+    var pillStyle: ChromeSelectionPill.Style {
+        if isSelected { return isFocused ? .selected : .selectedUnfocused }
+        return isHovered ? .hover : .none
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        ChromeSelectionPill.draw(pillStyle, in: bounds, colors: colors, inset: 0)
     }
 
     private func layoutContents() {
         let height = bounds.height
         let centerY = height / 2
-        rail.frame = CGRect(x: 0, y: 0, width: Self.railWidth, height: height)
         iconLayer.frame = CGRect(
             x: Self.leadingInset,
             y: ((height - Self.iconSide) / 2).rounded(),
@@ -373,7 +409,7 @@ final class ResultRowView: LauncherFlippedView {
         )
         accessoryLabel.isHidden = accessoryWidth <= 0
         accessoryLabel.frame = LauncherText.lineFrame(
-            minX: trailing - accessoryWidth, maxX: trailing, centerY: centerY, font: RetroFont.body(12)
+            minX: trailing - accessoryWidth, maxX: trailing, centerY: centerY, font: ChromeFont.meta
         )
         if accessoryWidth > 0 {
             trailing -= accessoryWidth + 10
@@ -392,28 +428,27 @@ final class ResultRowView: LauncherFlippedView {
             trailing -= keycaps.preferredWidth + 10
         }
 
-        let leading = Self.leadingInset + Self.iconSide + 10
+        let leading = Self.leadingInset + Self.iconSide + Self.gap
         let titleWidth = min(LauncherText.width(of: titleLabel.attributedStringValue), max(0, trailing - leading))
         titleLabel.frame = LauncherText.lineFrame(
-            minX: leading, maxX: leading + titleWidth, centerY: centerY, font: RetroFont.body(14)
+            minX: leading, maxX: leading + titleWidth, centerY: centerY, font: ChromeFont.row
         )
-        var x = titleLabel.frame.maxX + 6
+        // Label frames carry 2 pt of cell padding on each side: 4 here reads as 8.
+        var x = titleLabel.frame.maxX + 4
         let chipFits = hasAlias && x + aliasChip.preferredWidth <= trailing
         aliasChip.isHidden = !chipFits
         if chipFits {
             aliasChip.frame = CGRect(
-                x: x,
+                x: x + 2,
                 y: ((height - BadgeChipView.height) / 2).rounded(),
                 width: aliasChip.preferredWidth,
                 height: BadgeChipView.height
             )
-            x = aliasChip.frame.maxX + 8
-        } else {
-            x += 2
+            x = aliasChip.frame.maxX + 6
         }
         let subtitleWidth = max(0, trailing - x)
         subtitleLabel.isHidden = subtitleLabel.attributedStringValue.length == 0 || subtitleWidth < 24
-        subtitleLabel.frame = LauncherText.lineFrame(minX: x, maxX: trailing, centerY: centerY, font: RetroFont.body(12))
+        subtitleLabel.frame = LauncherText.lineFrame(minX: x, maxX: trailing, centerY: centerY + 1, font: ChromeFont.meta)
     }
 
     // MARK: - Pointer

@@ -2,33 +2,46 @@ import AppKit
 import SopranoCastCore
 
 /// Fake item icons: square tiles in the app's color with its initial for `.file` icons,
-/// dark tiles with a white SF Symbol for `.glyph`, the emoji on a dark tile for `.emoji`.
-/// No file system, network or workspace access, so snapshots are deterministic.
+/// the theme's Folio glyph tiles (`LiveIconProvider.glyphTileImage`) for `.glyph` and
+/// `.url`, the emoji on a glyph tile for `.emoji`. No file system, network or workspace
+/// access, so snapshots are deterministic.
 @MainActor
 final class FixtureIcons: IconProviding {
     private struct CacheKey: Hashable {
         var icon: ItemIcon
         var size: CGFloat
+        var themeID: String
     }
 
+    private let theme: @MainActor () -> AppTheme
     private var cache: [CacheKey: NSImage] = [:]
     /// Never called: fixture icons are drawn at once, nothing loads later.
     var onLoad: (() -> Void)?
 
-    init() {}
+    init(theme: @escaping @MainActor () -> AppTheme = { .folioPaper }) {
+        self.theme = theme
+    }
 
     func image(for icon: ItemIcon, size: CGFloat) -> NSImage {
-        let key = CacheKey(icon: icon, size: size)
+        let theme = theme()
+        let key = CacheKey(icon: icon, size: size, themeID: theme.id)
         if let cached = cache[key] { return cached }
-        let image = Self.makeImage(for: icon, size: max(size, 1))
+        let side = max(size, 1)
+        let image = switch icon {
+        case .glyph(let glyph):
+            LiveIconProvider.glyphTileImage(symbolName: LiveIconProvider.symbolName(for: glyph), size: side, colors: theme.colors)
+        case .url:
+            LiveIconProvider.glyphTileImage(symbolName: LiveIconProvider.symbolName(for: .link), size: side, colors: theme.colors)
+        case .file, .emoji:
+            Self.makeImage(for: icon, size: side, colors: theme.colors)
+        }
         cache[key] = image
         return image
     }
 
     private static let pixelScale: CGFloat = 2
-    private static let glyphTile: UInt32 = 0x2A2F3D
 
-    private static func makeImage(for icon: ItemIcon, size side: CGFloat) -> NSImage {
+    private static func makeImage(for icon: ItemIcon, size side: CGFloat, colors: ThemeColors) -> NSImage {
         let size = NSSize(width: side, height: side)
         guard let context = FixtureDrawing.makeContext(pointSize: size, scale: pixelScale) else {
             return NSImage(size: size)
@@ -47,19 +60,18 @@ final class FixtureIcons: IconProviding {
                     centeredIn: CGRect(x: 0, y: 0, width: side, height: side * 0.9)
                 )
             case .emoji(let emoji):
-                drawTile(rect, color: FixturePalette.color(hex: glyphTile), in: context)
+                let radius = side * 5 / 24
+                context.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+                context.setFillColor(colors.glyphTile.cgColor)
+                context.fillPath()
                 FixtureDrawing.drawText(
                     emoji,
                     font: .systemFont(ofSize: side * 0.6),
-                    color: .white,
+                    color: colors.textPrimary,
                     centeredIn: rect
                 )
-            case .glyph(let glyph):
-                drawTile(rect, color: FixturePalette.color(hex: glyphTile), in: context)
-                drawSymbol(symbolName(for: glyph), fallback: glyph.rawValue, in: rect)
-            case .url:
-                drawTile(rect, color: FixturePalette.color(hex: glyphTile), in: context)
-                drawSymbol(symbolName(for: .link), fallback: "link", in: rect)
+            case .glyph, .url:
+                break
             }
         }
         guard let image = context.makeImage() else { return NSImage(size: size) }
@@ -72,64 +84,18 @@ final class FixtureIcons: IconProviding {
         return last.hasSuffix(".app") ? String(last.dropLast(4)) : last
     }
 
+    /// An app-icon stand-in: a rounded tile in `color` with a darker band along the bottom.
     private static func drawTile(_ rect: CGRect, color: NSColor, in context: CGContext) {
+        let radius = rect.width * 0.22
+        let tile = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        context.saveGState()
+        context.addPath(tile)
+        context.clip()
         context.setFillColor(color.cgColor)
         context.fill(rect)
-        // A darker band along the bottom gives the flat tile some depth.
         context.setFillColor(NSColor.black.withAlphaComponent(0.18).cgColor)
         context.fill(CGRect(x: 0, y: rect.height * 0.78, width: rect.width, height: rect.height * 0.22))
-        context.setStrokeColor(NSColor.black.withAlphaComponent(0.35).cgColor)
-        context.setLineWidth(max(1, rect.width / 64))
-        context.stroke(rect.insetBy(dx: 0.5, dy: 0.5))
-    }
-
-    /// The symbol in white, 60 % of the tile; the glyph's initial when the symbol is missing.
-    /// Requires a flipped current graphics context.
-    private static func drawSymbol(_ name: String, fallback: String, in rect: CGRect) {
-        let configuration = NSImage.SymbolConfiguration(pointSize: rect.height * 0.5, weight: .semibold)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration)
-        else {
-            FixtureDrawing.drawText(
-                fallback.first.map { String($0).uppercased() } ?? "?",
-                font: .systemFont(ofSize: rect.height * 0.5, weight: .bold),
-                color: .white,
-                centeredIn: rect
-            )
-            return
-        }
-        let symbolSize = symbol.size
-        let fit = min(rect.width * 0.6 / max(symbolSize.width, 1), rect.height * 0.6 / max(symbolSize.height, 1))
-        let drawn = CGSize(width: symbolSize.width * fit, height: symbolSize.height * fit)
-        let target = CGRect(
-            x: rect.midX - drawn.width / 2,
-            y: rect.midY - drawn.height / 2,
-            width: drawn.width,
-            height: drawn.height
-        )
-        symbol.draw(in: target, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-    }
-
-    private static func symbolName(for glyph: BuiltinGlyph) -> String {
-        switch glyph {
-        case .power: "power"
-        case .lock: "lock.fill"
-        case .moon: "moon.fill"
-        case .display: "display"
-        case .trash: "trash.fill"
-        case .eject: "eject.fill"
-        case .appearance: "circle.lefthalf.filled"
-        case .quit: "xmark.circle.fill"
-        case .eyeSlash: "eye.slash.fill"
-        case .window: "macwindow"
-        case .link: "link"
-        case .script: "terminal.fill"
-        case .gear: "gearshape.fill"
-        case .magnifier: "magnifyingglass"
-        case .calculator: "plusminus"
-        case .refresh: "arrow.clockwise"
-        }
+        context.restoreGState()
     }
 }
 

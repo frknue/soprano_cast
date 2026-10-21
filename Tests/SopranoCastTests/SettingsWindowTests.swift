@@ -177,4 +177,23 @@ struct SettingsWindowTests {
         #expect(harness.store.settings.hyperKey == HyperKeySettings())
         #expect(harness.store.issues.isEmpty)
     }
+
+    @Test("the selected command shows the pencil tick only while the table has the keyboard; the hovered one a hover pill")
+    func tableSelectionFollowsFocus() throws {
+        let harness = try SettingsWindowHarness()
+        let extensions = harness.window.extensions
+        harness.window.show(tab: .extensions)
+        extensions.select(.item(chrome))
+        extensions.prepareForRender()
+        #expect(extensions.pillStyle(of: chrome.rawValue) == .selectedUnfocused)
+
+        harness.window.window?.makeFirstResponder(extensions.tableView)
+        #expect(extensions.pillStyle(of: chrome.rawValue) == .selected)
+
+        let mailRow = try #require(extensions.listedIDs.firstIndex(of: mail.rawValue))
+        extensions.tableView.setHoveredRow(mailRow)
+        #expect(extensions.pillStyle(of: mail.rawValue) == .hover)
+        extensions.tableView.setHoveredRow(-1)
+        #expect(extensions.pillStyle(of: mail.rawValue) == ChromeSelectionPill.Style.none)
+    }
 }

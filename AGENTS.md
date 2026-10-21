@@ -3,7 +3,7 @@
 Keyboard launcher for macOS in the Soprano family: a copy of Raycast's Root Search and
 hotkeys (global hotkeys of every Raycast type on any command, aliases, favorites, the Action
 Panel, window management, system commands, quicklinks, Raycast-format script commands, an
-inline calculator) in Soprano's "Mission Control" chrome. Swift 6 + programmatic AppKit (no
+inline calculator) in Soprano's Folio chrome. Swift 6 + programmatic AppKit (no
 storyboards/xibs/SwiftUI), SPM, macOS 14+, menu-bar app (no Dock icon). Shipped as a
 hand-packaged `.app` via `scripts/install.sh`. GitHub:
 [`frknue/soprano_cast`](https://github.com/frknue/soprano_cast) (public).
@@ -21,6 +21,7 @@ swift test --filter LauncherKeyRouterTests
 ./scripts/dev.sh --build-only        # package .build/debug/Soprano Cast Dev.app (com.soprano.cast.dev)
 ./scripts/install.sh                 # release build → /Applications/Soprano Cast.app
 .build/debug/SopranoCast snapshot --out /tmp/cast.png --query "chr" --report /tmp/cast.json
+.build/debug/SopranoCast snapshot --out /tmp/cast-ink.png --query "chr" --theme folio-ink
 .build/debug/SopranoCast snapshot --out /tmp/rec.png --query "chrome" --keys "shift+cmd+, return rec:cmd+1 wait" --report /tmp/rec.json
 .build/debug/SopranoCast snapshot --out /tmp/settings.png --settings-window extensions --select app:com.google.Chrome --report /tmp/settings.json
 .build/debug/SopranoCast list        # no bundle → port com.soprano.cast.cli: talks to the INSTALLED app
@@ -37,8 +38,10 @@ formatter; match surrounding style.
   5 System Settings panes, fixed time, usage and history), with no Dock icon, hotkey,
   permission or persisted state; `--report` writes query, row ids, selected id, overlay, footer toast, the
   runner's log and settings edits as JSON. `--settings-window <tab>` renders the settings
-  window on the same fixtures instead. Virtual time stands still unless a `wait` token lets
-  it pass, so a recorded hotkey only saves after `wait`. Usage (`SnapshotCommand.usage`):
+  window on the same fixtures instead. Snapshots draw Folio Paper unless `--theme` names
+  another palette (`folio-ink` for Ink); check visual changes in both. Virtual time stands
+  still unless a `wait` token lets it pass, so a recorded hotkey only saves after `wait`.
+  Usage (`SnapshotCommand.usage`):
 
   ```text
   usage: SopranoCast snapshot --out <png> [--query "<text>"] [--keys "<token> …"]
@@ -117,10 +120,14 @@ copied or not built yet; `docs/STATUS.md` the current state.
 
 ## Conventions
 
-- Chrome comes from Soprano: square corners, `ThemeColors` tokens only, Departure Mono via
-  `RetroFont.display` at 11 or 22 pt only (small caps; never uppercase strings by hand),
-  `RetroFont.body` for running text, `RetroLamp` the only round chrome. Appearance is
-  forced dark.
+- Chrome comes from Soprano's vendored `Chrome.swift` and `Theme.swift` (Folio): colors
+  only through `ThemeColors` and its derived tokens, system fonts through `ChromeFont`
+  (New York for titles ≥ 15 pt), radii from `Chrome.Radius`. Model strings are sentence
+  case; the view uppercases eyebrows (`ChromeText.eyebrow`). Hotkeys reach views as K1
+  caps (`KeyboardLayout.caps(for:)`, one cap per chord). Accent marks only the caret, the
+  pencil tick and matches on the selected row. Every window and panel takes its
+  appearance from the resolved theme (`theme.appearance.nsAppearance`); `NSApp.appearance`
+  stays unset so `folio` can follow the system.
 - Core is AppKit-free and everything in it is `public`.
 - `System/` is the only place that touches AX, Carbon hotkeys, `CGEventTap`, `hidutil`,
   Apple events or private symbols. The launcher talks to it only through the protocols in
@@ -142,14 +149,13 @@ copied or not built yet; `docs/STATUS.md` the current state.
 
 ## Gotchas
 
-- `Sources/SopranoCast/Vendored/` and `Sources/SopranoCastCore/Vendored/JSONCText.swift`
-  are copied from Soprano by `scripts/sync-soprano-chrome.sh` (committed Soprano state
-  only; source commit in `Vendored/SOPRANO_COMMIT`). Never edit them here: change Soprano,
-  commit there, re-run the script. `JSONCText` sits in Core because the settings resolver
-  and editor need it. Known upstream bug: its `removing` of an object's last member also
-  drops a trailing comment on the line before; fix it in Soprano.
-- `SopranoResources` (App/) keeps Soprano's name so vendored files compile unchanged; the
-  SPM resource bundle is `SopranoCast_SopranoCast.bundle`.
+- `Sources/SopranoCast/Vendored/`, `Sources/SopranoCastCore/Vendored/JSONCText.swift` and
+  `scripts/render-app-icon.swift` are copied from Soprano by `scripts/sync-soprano-chrome.sh`
+  (committed Soprano state only; source commit in `Vendored/SOPRANO_COMMIT`). Never edit
+  them here: change Soprano, commit there, re-run the script. `JSONCText` sits in Core
+  because the settings resolver and editor need it. Known upstream bug: its `removing` of
+  an object's last member also drops a trailing comment on the line before; fix it in
+  Soprano.
 - TCC grants (Accessibility, Automation) are tied to the signing identity. Sign with the
   shared "Soprano Local Development" identity (`scripts/sign-app.sh`,
   `scripts/ensure-local-signing-identity.sh`), or macOS forgets the permissions on every
