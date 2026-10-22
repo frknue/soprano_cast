@@ -121,4 +121,32 @@ struct ThemeCenterTests {
         settings.reload()
         #expect(applied.last == .some(nil))
     }
+
+    @Test("re-applying an unchanged theme leaves the app appearance alone, so its own KVO can't loop")
+    func unchangedThemeSetsNoAppearance() throws {
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try write(#"{ "theme": "folio" }"#, to: url)
+        let settings = SettingsCenter(fileURL: url)
+        settings.start(watching: false)
+        let system = SystemBox()
+        var applied: [NSAppearance.Name?] = []
+        let center = ThemeCenter(
+            sopranoSettingsURL: url, settings: settings,
+            systemAppearance: { system.appearance }, setApplicationAppearance: { applied.append($0?.name) }
+        )
+        center.start()
+        system.appearance = .dark
+        center.systemAppearanceDidChange()
+        center.systemAppearanceDidChange()
+        settings.reload()
+        #expect(center.theme.id == "folio-ink")
+        #expect(applied == [nil])
+
+        try write(#"{ "theme": "nord" }"#, to: url)
+        settings.reload()
+        center.systemAppearanceDidChange()
+        settings.reload()
+        #expect(applied == [nil, .darkAqua])
+    }
 }

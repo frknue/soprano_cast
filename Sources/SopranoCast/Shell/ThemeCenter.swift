@@ -31,6 +31,8 @@ final class ThemeCenter {
     private let setApplicationAppearance: @MainActor (NSAppearance?) -> Void
     private var sopranoWatcher: ConfigFileWatcher?
     private var appearanceObservation: NSKeyValueObservation?
+    /// The appearance last given to the app; `.none` until the first `apply()`.
+    private var appliedAppearance: NSAppearance.Name??
     private let observers = ObserverList<Void>()
     private var isStarted = false
 
@@ -112,16 +114,25 @@ final class ThemeCenter {
         let followsSystem = Self.followsSystem(themeID: themeID, soprano: soprano)
         // Unpinned first, so `systemAppearance` reads macOS rather than the last pin.
         if followsSystem {
-            setApplicationAppearance(nil)
+            setApplicationAppearanceIfChanged(nil)
         }
         let previous = theme.id
         theme = Self.resolve(themeID: themeID, soprano: soprano, system: systemAppearance())
         if !followsSystem {
-            setApplicationAppearance(theme.appearance.nsAppearance)
+            setApplicationAppearanceIfChanged(theme.appearance.nsAppearance)
         }
         if theme.id != previous {
             observers.notify(())
         }
+    }
+
+    /// Every `NSApp.appearance` set, even an unchanged one, fires the `effectiveAppearance`
+    /// observation, which calls `apply()` again: an unconditional set re-themes every
+    /// window in an endless loop.
+    private func setApplicationAppearanceIfChanged(_ appearance: NSAppearance?) {
+        guard appliedAppearance != .some(appearance?.name) else { return }
+        appliedAppearance = .some(appearance?.name)
+        setApplicationAppearance(appearance)
     }
 
     private func reloadSopranoTheme() {
