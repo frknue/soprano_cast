@@ -34,17 +34,19 @@ below, followed by what is not built yet.
 
 ## Linux (Omarchy)
 
-Furkan moves to Omarchy (Arch Linux, Hyprland, Wayland) later. Today only macOS builds.
+Furkan wechselt später auf Omarchy (Arch Linux, Hyprland, Wayland). Heute baut die App nur auf
+macOS.
 
-- First decide: port Soprano Cast, or theme and extend Omarchy's own launcher (Walker).
-- `SopranoCastCore` (about 5,800 lines, Foundation and CoreGraphics) is the part to keep: build
-  it on Linux (Swift through `swiftly`), with its own test target and a Linux CI job.
-- macOS-only, each needs a Linux route:
-  - Global hotkeys and the Hyper key (`RegisterEventHotKey`, `CGEvent` taps): Wayland lets no
-    app grab keys, so bind them in `hyprland.conf` to a `soprano-cast` command.
-  - App search (`NSWorkspace`, `NSMetadataQuery`): XDG `.desktop` files.
-  - Window commands (AX): Hyprland IPC (`hyprctl dispatch`, `hyprctl clients -j`).
-  - Battery and IOKit commands: `/sys/class/power_supply`, `upower`.
-  - Login item (`SMAppService`): `exec-once` in Hyprland or a systemd user unit.
-- The UI (about 16,800 lines of AppKit) is rebuilt on the toolkit chosen once for the family,
-  in Soprano first (every app syncs its chrome from there).
+- Zuerst entscheiden: Soprano Cast portieren oder Omarchys eigenen Launcher (Walker) thematisieren
+  und erweitern.
+- `SopranoCastCore` (etwa 5.800 Zeilen, Foundation und CoreGraphics) bleibt: auf Linux bauen
+  (Swift über `swiftly`), mit eigenem Testtarget und einem Linux-CI-Job.
+- Nur auf macOS vorhanden, jeweils mit Linux-Weg:
+  - Globale Hotkeys und die Hyper-Taste (`RegisterEventHotKey`, `CGEvent`-Taps): Unter Wayland
+    darf keine App Tasten abgreifen, also in `hyprland.conf` an einen `soprano-cast`-Befehl binden.
+  - App-Suche (`NSWorkspace`, `NSMetadataQuery`): XDG-`.desktop`-Dateien.
+  - Fensterbefehle (AX): Hyprland-IPC (`hyprctl dispatch`, `hyprctl clients -j`).
+  - Akku- und IOKit-Befehle: `/sys/class/power_supply`, `upower`.
+  - Anmeldeobjekt (`SMAppService`): `exec-once` in Hyprland oder eine systemd-User-Unit.
+- Die UI (etwa 16.800 Zeilen AppKit) wird auf dem Toolkit neu gebaut, das einmal für die ganze
+  Familie gewählt wird, zuerst in Soprano (jede App synct ihr Chrome von dort).
