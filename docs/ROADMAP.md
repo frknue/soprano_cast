@@ -31,3 +31,20 @@ below, followed by what is not built yet.
 - Move window to a Space.
 - Resize / Move Window with typed values.
 - Unit and currency conversion.
+
+## Linux (Omarchy)
+
+Furkan moves to Omarchy (Arch Linux, Hyprland, Wayland) later. Today only macOS builds.
+
+- First decide: port Soprano Cast, or theme and extend Omarchy's own launcher (Walker).
+- `SopranoCastCore` (about 5,800 lines, Foundation and CoreGraphics) is the part to keep: build
+  it on Linux (Swift through `swiftly`), with its own test target and a Linux CI job.
+- macOS-only, each needs a Linux route:
+  - Global hotkeys and the Hyper key (`RegisterEventHotKey`, `CGEvent` taps): Wayland lets no
+    app grab keys, so bind them in `hyprland.conf` to a `soprano-cast` command.
+  - App search (`NSWorkspace`, `NSMetadataQuery`): XDG `.desktop` files.
+  - Window commands (AX): Hyprland IPC (`hyprctl dispatch`, `hyprctl clients -j`).
+  - Battery and IOKit commands: `/sys/class/power_supply`, `upower`.
+  - Login item (`SMAppService`): `exec-once` in Hyprland or a systemd user unit.
+- The UI (about 16,800 lines of AppKit) is rebuilt on the toolkit chosen once for the family,
+  in Soprano first (every app syncs its chrome from there).
